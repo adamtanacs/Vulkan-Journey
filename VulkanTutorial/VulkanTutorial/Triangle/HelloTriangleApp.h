@@ -25,11 +25,14 @@ private:
 	const uint32_t WIDTH = 800;
 	const uint32_t HEIGHT = 600;
 	GLFWwindow* window;
+	VkInstance instance;
 
 	// Run functions
 	void initWindow();
 	void initVulkan();
+	void createInstance();
 	void mainLoop();
+	void cleanupVulkan();
 	void cleanup();
 };
 
