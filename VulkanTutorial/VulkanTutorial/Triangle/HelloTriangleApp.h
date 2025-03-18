@@ -7,12 +7,16 @@
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib>
+#include <vector>
 
 class HelloTriangleApp
 {
 public:
 	void run()
 	{
+		#ifdef NDEBUG
+		std::cout << "[DEBUG]: Validation layers enabled." << std::endl;
+		#endif
 		initWindow();
 		initVulkan();
 		mainLoop();
@@ -21,11 +25,34 @@ public:
 
 private:
 	
+	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+		VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+		VkDebugUtilsMessageTypeFlagsEXT messageType,
+		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+		void* pUserData);
+	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+
 	// Variables
 	const uint32_t WIDTH = 800;
 	const uint32_t HEIGHT = 600;
 	GLFWwindow* window;
 	VkInstance instance;
+
+	// Validation Layer
+	const std::vector<const char*> validationLayers =
+	{
+		"VK_LAYER_KHRONOS_validation"
+	};
+	#ifndef NDEBUG
+	const bool enableValidationLayers = false;
+	#else
+	const bool enableValidationLayers = true;
+	#endif
+	bool checkValidationLayerSupport();
+	VkDebugUtilsMessengerEXT debugMessenger;
+	void setupDebugMessenger();
+
+	std::vector<const char*> getRequiredExtensions();
 
 	// Run functions
 	void initWindow();
