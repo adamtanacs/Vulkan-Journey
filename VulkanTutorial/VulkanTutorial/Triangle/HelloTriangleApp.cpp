@@ -51,8 +51,11 @@ VKAPI_ATTR VkBool32 VKAPI_CALL HelloTriangleApp::debugCallback(
 			break;
 	}
 
+	if (messageSeverity < VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+		return VK_FALSE;
+
 	std::cerr << "[VALIDATION LAYER | " << severity
-			  << "]: " << pCallbackData->pMessage << std::endl;
+			  << "] : " << pCallbackData->pMessage << std::endl;
 	//return VK_TRUE;	// ABORT WITH ERROR
 	return VK_FALSE;	// ALWAYS
 }
@@ -153,6 +156,7 @@ void HelloTriangleApp::initVulkan()
 {
 	createInstance();
 	setupDebugMessenger();
+	pickPhysicalDevice();
 }
 
 void HelloTriangleApp::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
@@ -189,7 +193,7 @@ void HelloTriangleApp::setupDebugMessenger()
 
 	if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) 
 	{
-		throw std::runtime_error("[ERROR]: Failed to set up debug messenger!");
+		throw std::runtime_error("[ERROR] : Failed to set up debug messenger!");
 	}
 }
 
@@ -311,6 +315,93 @@ void HelloTriangleApp::createInstance()
 	// pointer to callback functions for memory allocations.
 }
 
+void HelloTriangleApp::pickPhysicalDevice()
+{
+	// Enumerate all available graphics cards with Vulkan support.
+	uint32_t deviceCount = 0;
+	vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+	if (deviceCount == 0)
+	{
+		throw std::runtime_error("[ERROR] : Failed to find GPUs with Vulkan support!");
+	}
+
+	// Hold all the handles of supported GPUs.
+	std::vector<VkPhysicalDevice> devices(deviceCount);
+	vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+	// Select first device suitable to use for Vulkan.
+	// Vulkan also allows to make
+	// a sort of "highest score" selections system too.
+	for (const auto& device : devices)
+	{
+		if (isDeviceSuitable(device))
+		{
+			physicalDevice = device;
+			break;
+		}
+	}
+
+	if (physicalDevice == VK_NULL_HANDLE)
+	{
+		throw std::runtime_error("[ERROR] : Failed to find a suitable GPU!");
+	}
+}
+
+bool HelloTriangleApp::isDeviceSuitable(VkPhysicalDevice device)
+{
+	// Get basic device properties 
+	// (Name, type, supported Vulkan version)
+	VkPhysicalDeviceProperties deviceProperties;
+	vkGetPhysicalDeviceProperties(device, &deviceProperties);
+
+	// Get optional funcionality support.
+	VkPhysicalDeviceFeatures deviceFeatures;
+	vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+	// Check if supports certain queue families
+	QueueFamilyIndices indices = findQueueFamilies(device);
+
+	return indices.isComplete();
+}
+
+QueueFamilyIndices HelloTriangleApp::findQueueFamilies(VkPhysicalDevice device)
+{
+	// Queue
+	// Contains commands, texture uploads and drawcalls that needs to be executed
+	// Queue families
+	// Divide queues by functionality (example: compute calls, memory transfare)
+
+	QueueFamilyIndices indices;
+
+	// Get queue families.
+	uint32_t queueFamilyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+	// Find queue families that support certain features.
+	int i = 0;
+	for (const auto queueFamily : queueFamilies)
+	{
+		// Find a queue family that supports graphics commands.
+		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+		{
+			indices.graphicsFamily = i;
+		}
+
+		// Early exit if we have support for all funcionalities.
+		if (indices.isComplete())
+		{
+			break;
+		}
+
+		i++;
+	}
+
+	return indices;
+}
+
 void HelloTriangleApp::mainLoop()
 {
 	while (!glfwWindowShouldClose(window))
@@ -329,6 +420,7 @@ void HelloTriangleApp::cleanupVulkan()
 	}
 
 	// Destroy instance last
+	// Also destroy VkPhysicalDevice impicitly.
 	vkDestroyInstance(instance, nullptr);
 }
 

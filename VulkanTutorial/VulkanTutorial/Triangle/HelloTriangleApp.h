@@ -8,6 +8,19 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
+#include <optional>
+
+// Struct defining supported Queue Families.
+struct QueueFamilyIndices
+{
+	// Graphics command support.
+	std::optional<uint32_t> graphicsFamily;
+
+	bool isComplete()
+	{
+		return graphicsFamily.has_value();
+	}
+};
 
 class HelloTriangleApp
 {
@@ -25,42 +38,48 @@ public:
 
 private:
 	
-	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-		VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-		VkDebugUtilsMessageTypeFlagsEXT messageType,
-		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-		void* pUserData);
-	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+
 
 	// Variables
 	const uint32_t WIDTH = 800;
 	const uint32_t HEIGHT = 600;
 	GLFWwindow* window;
-	VkInstance instance;
-
-	// Validation Layer
+	// Vulkan
 	const std::vector<const char*> validationLayers =
 	{
 		"VK_LAYER_KHRONOS_validation"
 	};
+	VkInstance instance;
+	VkDebugUtilsMessengerEXT debugMessenger;
+	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+
+	// Run functions
+	void initWindow();
+	void mainLoop();
+	void cleanup();
+	// Vulkan functions
+	void initVulkan();
+	void createInstance();
+	void pickPhysicalDevice();
+	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+	bool isDeviceSuitable(VkPhysicalDevice device);
+	void cleanupVulkan();
+
+	// Validation Layer
 	#ifndef NDEBUG
 	const bool enableValidationLayers = false;
 	#else
 	const bool enableValidationLayers = true;
 	#endif
-	bool checkValidationLayerSupport();
-	VkDebugUtilsMessengerEXT debugMessenger;
+	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+		VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+		VkDebugUtilsMessageTypeFlagsEXT messageType,
+		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+		void* pUserData);
 	void setupDebugMessenger();
-
 	std::vector<const char*> getRequiredExtensions();
-
-	// Run functions
-	void initWindow();
-	void initVulkan();
-	void createInstance();
-	void mainLoop();
-	void cleanupVulkan();
-	void cleanup();
+	bool checkValidationLayerSupport();
+	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 };
 
 // Resource Allocation note
