@@ -152,13 +152,6 @@ void HelloTriangleApp::initWindow()
 	window = glfwCreateWindow(WIDTH,HEIGHT,"Vulkan",nullptr,nullptr);
 }
 
-void HelloTriangleApp::initVulkan()
-{
-	createInstance();
-	setupDebugMessenger();
-	pickPhysicalDevice();
-}
-
 void HelloTriangleApp::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
 {
 	createInfo = {};
@@ -348,6 +341,61 @@ void HelloTriangleApp::pickPhysicalDevice()
 	}
 }
 
+void HelloTriangleApp::CreateLogicalDevice()
+{
+	// Logical Device : interface for physical device
+
+	// Create queues to use
+	QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+	VkDeviceQueueCreateInfo queueCreateInfo{};
+	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+	queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+	queueCreateInfo.queueCount = 1;
+	
+	// Assing priority to queue (even for single one).
+	float queuePriority = 1.0f;
+	queueCreateInfo.pQueuePriorities = &queuePriority;
+
+	// Specify device features to use.
+	VkPhysicalDeviceFeatures deviceFeatures{};
+
+	// Logical device creation infos.
+	VkDeviceCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	createInfo.pQueueCreateInfos = &queueCreateInfo;
+	createInfo.queueCreateInfoCount = 1;
+	createInfo.pEnabledFeatures = &deviceFeatures;
+
+	// Enable extensions.
+	// Note: these are device specific.
+	createInfo.enabledExtensionCount = 0;
+
+	// Enable Validation layers.
+	// Note: older versions of Vulkan made 
+	// instance and device Validation layer creation distinct.
+	// This is no longer the case, but its good practice to set them anyway
+	// to be compatible with older versions of Vulkan.
+	if (enableValidationLayers) {
+		createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+		createInfo.ppEnabledLayerNames = validationLayers.data();
+	}
+	else {
+		createInfo.enabledLayerCount = 0;
+	}
+
+	// Create logical device.
+	if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create logical device!");
+	}
+
+	// Retrieve queue handles.
+	{
+		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+	}
+}
+
 bool HelloTriangleApp::isDeviceSuitable(VkPhysicalDevice device)
 {
 	// Get basic device properties 
@@ -418,6 +466,9 @@ void HelloTriangleApp::cleanupVulkan()
 	{
 		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 	}
+
+	// Destroy logical device.
+	vkDestroyDevice(device, nullptr);
 
 	// Destroy instance last
 	// Also destroy VkPhysicalDevice impicitly.

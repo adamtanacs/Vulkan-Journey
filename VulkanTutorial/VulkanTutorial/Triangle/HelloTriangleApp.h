@@ -38,8 +38,6 @@ public:
 
 private:
 	
-
-
 	// Variables
 	const uint32_t WIDTH = 800;
 	const uint32_t HEIGHT = 600;
@@ -52,15 +50,24 @@ private:
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	VkDevice device; // Logical device
+	VkQueue graphicsQueue;
 
 	// Run functions
 	void initWindow();
 	void mainLoop();
 	void cleanup();
 	// Vulkan functions
-	void initVulkan();
+	void initVulkan()
+	{
+		createInstance();
+		setupDebugMessenger();
+		pickPhysicalDevice();
+		CreateLogicalDevice();
+	}
 	void createInstance();
 	void pickPhysicalDevice();
+	void CreateLogicalDevice();
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	bool isDeviceSuitable(VkPhysicalDevice device);
 	void cleanupVulkan();
