@@ -1,4 +1,12 @@
 #pragma once
+
+// To access Windows native support.
+//#define VK_USE_PLATFORM_WIN32_KHR
+//#define GLFW_INCLUDE_VULKAN
+//#include <GLFW/glfw3.h>
+//#define GLFW_EXPOSE_NATIVE_WIN32
+//#include <GLFW/glfw3native.h>
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -8,6 +16,7 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
+#include <set>
 #include <optional>
 
 // Struct defining supported Queue Families.
@@ -15,10 +24,11 @@ struct QueueFamilyIndices
 {
 	// Graphics command support.
 	std::optional<uint32_t> graphicsFamily;
+	std::optional<uint32_t> presentFamily;
 
 	bool isComplete()
 	{
-		return graphicsFamily.has_value();
+		return graphicsFamily.has_value() && presentFamily.has_value();
 	}
 };
 
@@ -52,6 +62,8 @@ private:
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device; // Logical device
 	VkQueue graphicsQueue;
+	VkQueue presentQueue;
+	VkSurfaceKHR surface;
 
 	// Run functions
 	void initWindow();
@@ -61,6 +73,7 @@ private:
 	void initVulkan()
 	{
 		createInstance();
+		createSurface();
 		setupDebugMessenger();
 		pickPhysicalDevice();
 		CreateLogicalDevice();
@@ -70,6 +83,7 @@ private:
 	void CreateLogicalDevice();
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	bool isDeviceSuitable(VkPhysicalDevice device);
+	void createSurface();
 	void cleanupVulkan();
 
 	// Validation Layer
