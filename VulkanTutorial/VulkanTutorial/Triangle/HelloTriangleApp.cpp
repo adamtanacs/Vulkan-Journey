@@ -541,6 +541,90 @@ void HelloTriangleApp::createImageViews()
 	}
 }
 
+void HelloTriangleApp::createGraphicsPipeline()
+{
+	// Graphics pipeline: sequence of operations, takes in vertices/textures and renders them
+	// Stages: (P : programable, F : fixed stages) (Pipeline is from top-to-bottom)
+	// Input assembler		(F) : collects raw vertex data, 
+	//							  may use indices to avoid repeat vertex data
+	// Vertex shader		(P)	: runs for every vertex, 
+	//							  applies transformations (turn model space to screen space)
+	//							  passes down per-vertex data down the pipeline
+	// Tessalation shader	(P)	: subdivide geometry 
+	// (optional)				  based on certain rules to increase mesh quality
+	// Geometry shader		(P)	: runs for every primitive (tri, line, point),
+	// (optional)				  discard/outputs more of them (similar to Tesselation shader)
+	//							  not used much because of performance
+	// Rasterization		(F) : discretizes primitives into fragments,
+	//							  discards elements outside screen/during depth testing,
+	//							  interpolates vertex attributes between fragments
+	// Fragment shader		(P) : runs for every surviving fragments,
+	// (optional)				  determines which framebuffer(s) are written to and color/depth values, 
+	//							  interpolate between data from vertex shader (normals,texture coords)
+	// Color blending		(F) : mix different fragments that map to the same pixel
+	// 
+	// Pipeline setting can be changed (just like in OGL)
+	// Pipeline is immutable (means when doing changes, you need to do it from scratch again)
+
+
+	// Reading pre-compiled SPIR-V shaders
+	auto vertShaderCode = ShaderCompiler::readFile("vert.spv");
+	auto fragShaderCode = ShaderCompiler::readFile("frag.spv");
+
+	// Create shader modules for each shaders
+	VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+	VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+	// Define vertex shader stage of graphics pipeline
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT; /* define it as vertex shader */
+	vertShaderStageInfo.module = vertShaderModule;
+	// Define entry point a.k.a "main" function
+	vertShaderStageInfo.pName = "main";
+	// Allows us to define constant values of shader constants
+	// More effecient than using it at runtime
+	// Enables optimalizations (eliminate "if"s)
+	vertShaderStageInfo.pSpecializationInfo = nullptr;
+
+	// Define fragment shader stage of graphics pipeline
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT; /* define it as fragment shader */
+	fragShaderStageInfo.module = fragShaderModule;
+	fragShaderStageInfo.pName = "main";
+
+	// Collect the shader stage creation infos into an array
+	VkPipelineShaderStageCreateInfo shaderstages[] = {
+		vertShaderStageInfo,
+		fragShaderStageInfo 
+	};
+
+	// Cleaning up shader modules
+	vkDestroyShaderModule(device, fragShaderModule, nullptr);
+	vkDestroyShaderModule(device, vertShaderModule, nullptr);
+}
+
+VkShaderModule HelloTriangleApp::createShaderModule(const std::vector<char>& code)
+{
+	// Define shader module creation parameters
+	VkShaderModuleCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = code.size();
+	// Bytecode is specified in bytes, 
+	// but pCode is const uint32*, 
+	// therefore we need to recast it
+	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+	VkShaderModule shaderModule;
+	if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create shader module!");
+	}
+
+	return shaderModule;
+}
+
 bool HelloTriangleApp::checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
 	// Enumerate all the available extensions

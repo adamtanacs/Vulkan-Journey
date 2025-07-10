@@ -22,6 +22,8 @@
 #include <limits>
 #include <algorithm>
 
+#include "ShaderCompiler.h"
+
 // Struct defining supported Queue Families.
 struct QueueFamilyIndices
 {
@@ -98,12 +100,15 @@ private:
 		CreateLogicalDevice();
 		createSwapChain();
 		createImageViews();
+		createGraphicsPipeline();
 	}
 	void createInstance();
 	void pickPhysicalDevice();
 	void CreateLogicalDevice();
 	void createSwapChain();
 	void createImageViews();
+	void createGraphicsPipeline();
+	VkShaderModule createShaderModule(const std::vector<char>& code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
