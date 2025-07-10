@@ -18,6 +18,9 @@
 #include <vector>
 #include <set>
 #include <optional>
+#include <cstdint>
+#include <limits>
+#include <algorithm>
 
 // Struct defining supported Queue Families.
 struct QueueFamilyIndices
@@ -25,11 +28,18 @@ struct QueueFamilyIndices
 	// Graphics command support.
 	std::optional<uint32_t> graphicsFamily;
 	std::optional<uint32_t> presentFamily;
+	
 
 	bool isComplete()
 	{
 		return graphicsFamily.has_value() && presentFamily.has_value();
 	}
+};
+
+struct SwapChainSupportDetails {
+	VkSurfaceCapabilitiesKHR capabilities;		/*Min/max number of images, width and  height of images*/
+	std::vector<VkSurfaceFormatKHR> formats;	/*Surface formats (pixel format, color space)*/
+	std::vector<VkPresentModeKHR> presentModes;	/*Available presentation modes*/
 };
 
 class HelloTriangleApp
@@ -57,13 +67,19 @@ private:
 	{
 		"VK_LAYER_KHRONOS_validation"
 	};
+	const std::vector<const char*> deviceExtensions = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME
+	};
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device; // Logical device
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
+	// (presentation queue implies support for swapchains)
+
 	VkSurfaceKHR surface;
+	VkSwapchainKHR swapChain;
 
 	// Run functions
 	void initWindow();
@@ -77,13 +93,20 @@ private:
 		setupDebugMessenger();
 		pickPhysicalDevice();
 		CreateLogicalDevice();
+		createSwapChain();
 	}
 	void createInstance();
 	void pickPhysicalDevice();
 	void CreateLogicalDevice();
+	void createSwapChain();
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
+	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 	bool isDeviceSuitable(VkPhysicalDevice device);
 	void createSurface();
+	VkSurfaceFormatKHR chooseSwapSufraceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+	VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes);
+	VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 	void cleanupVulkan();
 
 	// Validation Layer
