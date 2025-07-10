@@ -80,6 +80,7 @@ private:
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapChain;
 	std::vector<VkImage> swapChainImages; /*Cleaned up once swapchain is destroyed*/
+	std::vector<VkImageView> swapChainImageViews;
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
 
@@ -96,11 +97,13 @@ private:
 		pickPhysicalDevice();
 		CreateLogicalDevice();
 		createSwapChain();
+		createImageViews();
 	}
 	void createInstance();
 	void pickPhysicalDevice();
 	void CreateLogicalDevice();
 	void createSwapChain();
+	void createImageViews();
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);

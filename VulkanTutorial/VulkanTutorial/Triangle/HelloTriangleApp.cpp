@@ -504,6 +504,43 @@ void HelloTriangleApp::createSwapChain()
 	swapChainExtent = extent;
 }
 
+void HelloTriangleApp::createImageViews()
+{
+	// VkImageView : object which describes how to access an image and which part to access
+	
+	// Create view for each and every swap chain image
+	swapChainImageViews.resize(swapChainImages.size());
+	for (size_t i = 0; i < swapChainImages.size(); ++i)
+	{
+		VkImageViewCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		createInfo.image = swapChainImages[i];
+
+		// Specify how the image data should be interpreted
+		createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; /* 1D,2D or 3D texture */
+		createInfo.format = swapChainImageFormat;
+
+		// Option to swizzle around color channels or map constant values (0 or 1)
+		createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+		// Describe what the image's purpose is and which part should be accessed
+		createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		createInfo.subresourceRange.baseMipLevel = 0; /* Mipmap level first to be accessed */
+		createInfo.subresourceRange.levelCount = 1; /* No mipmapping levels */
+		// These are only used for stereographic 3D applications
+		createInfo.subresourceRange.baseArrayLayer = 0;
+		createInfo.subresourceRange.layerCount = 1;
+
+		if (vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS)
+		{
+			throw std::runtime_error("[ERROR] : Failed to create image views!");
+		}
+	}
+}
+
 bool HelloTriangleApp::checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
 	// Enumerate all the available extensions
@@ -751,6 +788,12 @@ void HelloTriangleApp::cleanupVulkan()
 	if (enableValidationLayers)
 	{
 		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+	}
+
+	// Destroy image views
+	for (auto imageView : swapChainImageViews)
+	{
+		vkDestroyImageView(device, imageView, nullptr);
 	}
 
 	// Destroy swap chain
