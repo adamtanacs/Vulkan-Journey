@@ -492,6 +492,16 @@ void HelloTriangleApp::createSwapChain()
 	{
 		throw std::runtime_error("[ERROR] : Failed to create swap chain!");
 	}
+
+	// Retrieve handles to Images of the swap chain
+	// (Reuse imageCount uint32_t)
+	vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr); /*can be more then min*/
+	swapChainImages.resize(imageCount);
+	vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+
+	// Store format and extent of our swap chain for future use
+	swapChainImageFormat = surfaceFormat.format;
+	swapChainExtent = extent;
 }
 
 bool HelloTriangleApp::checkDeviceExtensionSupport(VkPhysicalDevice device)

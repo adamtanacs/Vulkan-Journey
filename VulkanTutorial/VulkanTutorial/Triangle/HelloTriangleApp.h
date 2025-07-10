@@ -75,11 +75,13 @@ private:
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device; // Logical device
 	VkQueue graphicsQueue;
-	VkQueue presentQueue;
-	// (presentation queue implies support for swapchains)
+	VkQueue presentQueue; /*Presentation queue implies support for swapchains*/
 
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapChain;
+	std::vector<VkImage> swapChainImages; /*Cleaned up once swapchain is destroyed*/
+	VkFormat swapChainImageFormat;
+	VkExtent2D swapChainExtent;
 
 	// Run functions
 	void initWindow();
