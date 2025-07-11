@@ -831,6 +831,79 @@ VkShaderModule HelloTriangleApp::createShaderModule(const std::vector<char>& cod
 	return shaderModule;
 }
 
+void HelloTriangleApp::createRenderPass()
+{
+	// Define framebuffer attachments that will be used while rendering
+	// Specify how many color/depth buffers there will be,
+	// how many samples to use for each of them and how their contents
+	// should be handled throughout the rendering operations
+	VkAttachmentDescription colorAttachment{};
+	colorAttachment.format = swapChainImageFormat;		/* swap chain image format */
+	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;	/* no multi sampling so its 1*/
+	// Define what to do with COLOR and DEPTH data BEFORE rendering
+	// VK_ATTACHMENT_LOAD_OP_LOAD		: preserve existing contest
+	// VK_ATTACHMENT_LOAD_OP_CLEAR		: clear values to a constant at start
+	// VK_ATTACHMENT_LOAD_OP_DONT_CARE	: existing contents are undefined
+	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	// Define what to do with COLOR and DEPTH data AFTER rendering
+	// VK_ATTACHMENT_STORE_OP_STORE		: store contents in memory for reading
+	// VK_ATTACHMENT_STORE_OP_DONT_CARE	: contents of the framebuffer will be undefined
+	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	// Stencil : screen sized buffer, lets you mask off sections of the screen
+	// Stencil and scissors are different
+	// Stencil can map to any shape			- (per pixel)
+	// Scissors can only map to rectangles	- (per polygon)
+	// Define what to do with STENCIL data BEFORE rendering
+	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	// Define what to do with STENCIL data AFTER rendering
+	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	// Define initial (before render pass) 
+	// and final (after render pass) layout of framebuffer
+	// All framebuffers are represented as VkImage objects
+	// Most common layouts:
+	// VK_IMAGE_LAYOUT_UNDEFINED				: we don't care about previous layout
+	// VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL	: for color attachment
+	// VK_IMAGE_LAYOUT_PRESENT_SRC_KHR			: to be presented in swap chain
+	// VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL		: as destination for memory copy operation
+	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	// One render pass can consist of multiple subpasses
+	// Every subpass references one or more attachments (described in this struct)
+	VkAttachmentReference colorAttachmentRef{};
+	// Specifies which attachments to reference by its index
+	// Referenced in fragment shader: layout(location = 0) out vec4 outColor
+	colorAttachmentRef.attachment = 0;	/* reference first element */
+	// Specifies which layout to have during a subpass (automatically transitions to it)
+	// For all VkImage layouts : https://registry.khronos.org/vulkan/specs/latest/man/html/VkImageLayout.html
+	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	// Define subpass details
+	VkSubpassDescription subpass{};
+	// Define it as graphics subpass
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colorAttachmentRef;
+	// Other attachments that can be referenced by a subpass
+	// subpass.pInputAttachments		: read from a shader
+	// subpass.pResolveAttachments		: used for multisampling color attachments
+	// subpass.pDepthStencilAttachment	: used for depth and stencil data
+	// subpass.pPreserveAttachments		: not used by subpass but MUST be preserved
+
+	// Creating our render pass
+	VkRenderPassCreateInfo renderPassInfo{};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassInfo.attachmentCount = 1;
+	renderPassInfo.pAttachments = &colorAttachment;
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subpass;
+
+	if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create render pass!");
+	}
+}
+
 bool HelloTriangleApp::checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
 	// Enumerate all the available extensions
@@ -1074,11 +1147,11 @@ void HelloTriangleApp::mainLoop()
 
 void HelloTriangleApp::cleanupVulkan()
 {
-	// Destroy Debug messenger object
-	if (enableValidationLayers)
-	{
-		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-	}
+	// Destroy pipeline layout
+	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+
+	// Destroy render pass
+	vkDestroyRenderPass(device, renderPass, nullptr);
 
 	// Destroy image views
 	for (auto imageView : swapChainImageViews)
@@ -1086,14 +1159,17 @@ void HelloTriangleApp::cleanupVulkan()
 		vkDestroyImageView(device, imageView, nullptr);
 	}
 
-	// Destroy pipeline layout
-	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-
 	// Destroy swap chain
 	vkDestroySwapchainKHR(device, swapChain, nullptr);
 
 	// Destroy logical device.
 	vkDestroyDevice(device, nullptr);
+
+	// Destroy Debug messenger object
+	if (enableValidationLayers)
+	{
+		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+	}
 
 	// Destroy window surface.
 	vkDestroySurfaceKHR(instance, surface, nullptr);
