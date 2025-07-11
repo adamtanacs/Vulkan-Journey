@@ -568,6 +568,8 @@ void HelloTriangleApp::createGraphicsPipeline()
 	// Pipeline setting can be changed (just like in OGL)
 	// Pipeline is immutable (means when doing changes, you need to do it from scratch again)
 
+	// ---------------------------- SHADER MODULES ----------------------------
+	// Define programable stages of the graphics pipeline
 
 	// Reading pre-compiled SPIR-V shaders
 	auto vertShaderCode = ShaderCompiler::readFile("vert.spv");
@@ -597,10 +599,13 @@ void HelloTriangleApp::createGraphicsPipeline()
 	fragShaderStageInfo.pName = "main";
 
 	// Collect the shader stage creation infos into an array
-	VkPipelineShaderStageCreateInfo shaderstages[] = {
+	VkPipelineShaderStageCreateInfo shaderStages[] = {
 		vertShaderStageInfo,
 		fragShaderStageInfo
 	};
+
+	// ------------------------- FIXED-FUNCTION STATE -------------------------
+	// Define fixed stages of the graphics pipeline.
 
 	// We can define dynamic states, 
 	// which can be changed without recreating the pipeline at draw time.
@@ -791,6 +796,9 @@ void HelloTriangleApp::createGraphicsPipeline()
 	colorBlending.blendConstants[2] = 0.0f;
 	colorBlending.blendConstants[3] = 0.0f;
 
+	// --------------------------- PIPELINE LAYOUT ----------------------------
+	// Define uniform and push values, referenced by shaders, updated at draw time
+	
 	// Create pipeline layout for our renderer
 	// Note: uniform values needs to be defined here
 	// Uniform values: dynamic state variables that can be changed at draw time
@@ -804,6 +812,49 @@ void HelloTriangleApp::createGraphicsPipeline()
 	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
 	{
 		throw std::runtime_error("[ERROR] : Failed to create pipeline layout!");
+	}
+
+	// -------------------------- PIPELINE ASSEMBLY ---------------------------
+	// Assemble our graphics pipeline to dispatch drawing operations
+
+	VkGraphicsPipelineCreateInfo pipelineInfo{};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	// Define the programable stages of our pipeline
+	pipelineInfo.stageCount = 2; /* vertex/fragment stages */
+	pipelineInfo.pStages = shaderStages;
+	// Define fixed-function stage of our pipeline, one-by-one
+	pipelineInfo.pVertexInputState		= &vertexInputInfo;
+	pipelineInfo.pInputAssemblyState	= &inputAssembly;
+	pipelineInfo.pViewportState			= &viewportState;
+	pipelineInfo.pRasterizationState	= &rasterizer;
+	pipelineInfo.pMultisampleState		= &multisampling;
+	pipelineInfo.pDepthStencilState		= nullptr;
+	pipelineInfo.pColorBlendState		= &colorBlending;
+	pipelineInfo.pDynamicState			= &dynamicState;
+	// Define the pipeline layout
+	pipelineInfo.layout = pipelineLayout;
+	// Define render pass of our pipeline
+	// Its possible to switch up the render pass of our pipeline
+	// More about that: https://docs.vulkan.org/spec/latest/chapters/renderpass.html#renderpass-compatibility
+	pipelineInfo.renderPass = renderPass;
+	pipelineInfo.subpass = 0;	/* no subpasses */
+	// Define pipeline by deriving it from an already existing one
+	// Mainly for efficiency, when defining functionally similar pipelines
+	// Can be done with handle or with index
+	// Only used if:
+	// pipelineInfo.flags = VK_PIPELINE_CREATE_DERIVATIVE_BIT;
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+	pipelineInfo.basePipelineIndex = -1;
+
+	if (vkCreateGraphicsPipelines(
+		device, 
+		VK_NULL_HANDLE, /* used to significantly speed up pipeline creation */
+		1, 
+		&pipelineInfo,  /* multiple pipelines can be created with a single call */
+		nullptr, 
+		&graphicsPipeline) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create graphics pipeline!");
 	}
 
 	// Cleaning up shader modules
@@ -833,6 +884,9 @@ VkShaderModule HelloTriangleApp::createShaderModule(const std::vector<char>& cod
 
 void HelloTriangleApp::createRenderPass()
 {
+	// ----------------------------- RENDER PASS ------------------------------
+	// Define attachments referenced by the pipeline stages and their usage
+	
 	// Define framebuffer attachments that will be used while rendering
 	// Specify how many color/depth buffers there will be,
 	// how many samples to use for each of them and how their contents
@@ -1147,6 +1201,9 @@ void HelloTriangleApp::mainLoop()
 
 void HelloTriangleApp::cleanupVulkan()
 {
+	// Destroy (grahpics) pipeline
+	vkDestroyPipeline(device, graphicsPipeline, nullptr);
+
 	// Destroy pipeline layout
 	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 
