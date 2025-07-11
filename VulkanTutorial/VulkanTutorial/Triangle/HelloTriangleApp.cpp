@@ -958,6 +958,38 @@ void HelloTriangleApp::createRenderPass()
 	}
 }
 
+void HelloTriangleApp::createFramebuffers()
+{
+	swapChainFramebuffers.resize(swapChainImageViews.size());
+
+	for (size_t i = 0; i < swapChainImageViews.size(); ++i)
+	{
+
+		VkImageView attachments[] = {
+			swapChainImageViews[i]
+		};
+
+		// Define framebuffer properties
+		VkFramebufferCreateInfo framebufferInfo{};
+		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		// Define which render pass does it belong to
+		framebufferInfo.renderPass = renderPass;
+		// Define VkImageView object for the framebuffer
+		framebufferInfo.attachmentCount = 1;
+		framebufferInfo.pAttachments = attachments;
+		// Define framebuffer size (equal to swap chain extent)
+		framebufferInfo.width = swapChainExtent.width;
+		framebufferInfo.height = swapChainExtent.height;
+		// Define how many layers does our swap chain image consts of.
+		framebufferInfo.layers = 1;
+
+		if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS)
+		{
+			throw std::runtime_error("[ERROR] : Failed to create framebuffer!");
+		}
+	}
+}
+
 bool HelloTriangleApp::checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
 	// Enumerate all the available extensions
@@ -1201,6 +1233,12 @@ void HelloTriangleApp::mainLoop()
 
 void HelloTriangleApp::cleanupVulkan()
 {
+	// Destroy framebuffer objects
+	for (auto framebuffer : swapChainFramebuffers)
+	{
+		vkDestroyFramebuffer(device, framebuffer, nullptr);
+	}
+
 	// Destroy (grahpics) pipeline
 	vkDestroyPipeline(device, graphicsPipeline, nullptr);
 

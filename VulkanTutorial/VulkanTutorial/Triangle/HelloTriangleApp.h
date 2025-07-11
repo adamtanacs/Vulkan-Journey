@@ -83,6 +83,7 @@ private:
 	VkSwapchainKHR swapChain;
 	std::vector<VkImage> swapChainImages; /*Cleaned up once swapchain is destroyed*/
 	std::vector<VkImageView> swapChainImageViews;
+	std::vector<VkFramebuffer> swapChainFramebuffers;
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
 	VkRenderPass renderPass;
@@ -105,6 +106,7 @@ private:
 		createImageViews();
 		createRenderPass();
 		createGraphicsPipeline();
+		createFramebuffers();
 	}
 	void createInstance();
 	void pickPhysicalDevice();
@@ -113,6 +115,7 @@ private:
 	void createImageViews();
 	void createGraphicsPipeline();
 	void createRenderPass();
+	void createFramebuffers();
 	VkShaderModule createShaderModule(const std::vector<char>& code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
