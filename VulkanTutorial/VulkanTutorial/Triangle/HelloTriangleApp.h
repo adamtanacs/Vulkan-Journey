@@ -77,11 +77,11 @@ private:
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device; // Logical device
 	VkQueue graphicsQueue;
-	VkQueue presentQueue; /*Presentation queue implies support for swapchains*/
+	VkQueue presentQueue; /* Presentation queue implies support for swapchains */
 
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapChain;
-	std::vector<VkImage> swapChainImages; /*Cleaned up once swapchain is destroyed*/
+	std::vector<VkImage> swapChainImages; /* Cleaned up once swapchain is destroyed */
 	std::vector<VkImageView> swapChainImageViews;
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 	VkFormat swapChainImageFormat;
@@ -89,6 +89,13 @@ private:
 	VkRenderPass renderPass;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
+	VkCommandPool commandPool;	/* Manange memory of buffers/command buffers */
+	VkCommandBuffer commandBuffer; /* Cleaned up once command pool is destroyed */
+	VkClearValue clearColor = { 
+		{
+			{ 0.125f, 0.25f, 0.5f, 1.0f }
+		} 
+	};
 
 	// Run functions
 	void initWindow();
@@ -107,6 +114,8 @@ private:
 		createRenderPass();
 		createGraphicsPipeline();
 		createFramebuffers();
+		createCommandPool();
+		createCommandBuffer();
 	}
 	void createInstance();
 	void pickPhysicalDevice();
@@ -116,6 +125,9 @@ private:
 	void createGraphicsPipeline();
 	void createRenderPass();
 	void createFramebuffers();
+	void createCommandPool();
+	void createCommandBuffer();
+	void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 	VkShaderModule createShaderModule(const std::vector<char>& code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);

@@ -647,29 +647,6 @@ void HelloTriangleApp::createGraphicsPipeline()
 	// Used for optimalisation to break up lines/triangles to _STRIP topologies
 	inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-	// Define viewport for rendering
-	// Viewport defines transformations from image to framebuffer
-	// Almost always (0,0) to (width,height)
-	VkViewport viewport{};
-	// Set offset of viewport
-	viewport.x			= 0.0f; 
-	viewport.y			= 0.0;
-	// Set size of viewport
-	// Remember : 
-	// swapchain width/height NOT EQUAL width/height of window
-	viewport.width		= (float)swapChainExtent.width;
-	viewport.height		= (float)swapChainExtent.height;
-	// Set depth value range
-	viewport.minDepth	= 0.0f;
-	viewport.maxDepth	= 1.0f;
-
-	// Define scissor for rendering
-	// Scissor defines which regions/pixels will actually be stored 
-	// outside pixels will be discarded (filters them out)
-	VkRect2D scissor{};
-	scissor.offset = { 0,0 };
-	scissor.extent = swapChainExtent;
-
 	// Define viewport state for pipeline
 	// Using multiple viewports/scissors requires enabling it at logical device creation
 	VkPipelineViewportStateCreateInfo viewportState{};
@@ -990,6 +967,170 @@ void HelloTriangleApp::createFramebuffers()
 	}
 }
 
+void HelloTriangleApp::createCommandPool()
+{
+	QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
+
+	// Define command pool properties
+	VkCommandPoolCreateInfo poolInfo{};
+	// Define usage behaviour through a bitmask
+	// VK_COMMAND_POOL_CREATE_TRANSIENT_BIT				: short-lifetime,
+	//													  will be reseted/freed often
+	// VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT	: allows to be individially 
+	//													  reseted to initial state
+	// VK_COMMAND_POOL_CREATE_PROTECTED_BIT				: allocated command buffers 
+	//													  are protected command buffers
+	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	// Set (graphics) queue family to be used for creation
+	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+	if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create command pool!");
+	}
+}
+
+void HelloTriangleApp::createCommandBuffer()
+{
+	// Define command buffer properties for allocation
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	// Define which command pool will it belong to
+	allocInfo.commandPool = commandPool;
+	// Define if its:
+	// VK_COMMAND_BUFFER_LEVEL_PRIMARY		: can be submited to a queue for execution
+	//										  cannot be called from other buffers
+	// VK_COMMAND_BUFFER_LEVEL_SECONDARY	: cannot be sumbitted directly, but
+	//										  can be called from primary command buffers
+	// (used for common operation exections)
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	// Define number of command buffers to allocate
+	allocInfo.commandBufferCount = 1;
+
+	if (vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer) != VK_SUCCESS) {
+		throw std::runtime_error("[ERROR] : Failed to allocate command buffers!");
+	}
+}
+
+void HelloTriangleApp::recordCommandBuffer(
+	VkCommandBuffer commandBuffer,	/* command buffer to allocate commands */
+	uint32_t imageIndex				/* index of current swap chain image */
+)
+{
+	// Begin recording commands by calling vkBeginCommandBuffer
+	// Implicitly resets command buffer
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	// Define how we want to use the command buffer
+	// VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT		: will be rerecorded,
+	//													  right after execution
+	// VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT	: secondary command buffer,
+	//													  entirely within a single render pass
+	// VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT		: will be resubmitted,
+	//													  while it also pending execution
+	beginInfo.flags = 0;
+	// Specify which state to inherite from the calling primary buffer
+	// Only relevant for secondary buffers
+	beginInfo.pInheritanceInfo = nullptr;
+
+	if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
+		throw std::runtime_error("[ERROR] : Failed to begin recording command buffer!");
+	}
+
+	// Define begin render pass properties
+	VkRenderPassBeginInfo renderPassInfo{};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassInfo.renderPass = renderPass;
+	renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+	// Define render area offset/extent
+	// Match size of attachments for best performance
+	renderPassInfo.renderArea.offset = { 0,0 };
+	renderPassInfo.renderArea.extent = swapChainExtent;
+	// Define clear values to use for VK_ATTACHMENT_LOAD_OP_CLEAR
+	renderPassInfo.clearValueCount = 1;
+	renderPassInfo.pClearValues = &clearColor;
+
+	// Begin render pass and also start drawing
+
+	vkCmdBeginRenderPass(
+		commandBuffer,				/* command buffer to record to */
+		&renderPassInfo,			/* details of the render pass */
+		// How the draw commands are provided
+		// Possible two values for this:
+		// VK_SUBPASS_CONTENTS_INLINE : render pass commands are embedded in the 
+		//								primary command buffer, 
+		//								no secondary command buffer will be executed
+		// VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS : render pass commands will be
+		//												   executed from 
+		//												   secondary command buffers
+		VK_SUBPASS_CONTENTS_INLINE
+	);
+	{
+		vkCmdBindPipeline(
+			commandBuffer, 
+			VK_PIPELINE_BIND_POINT_GRAPHICS, /* define pipeline object type */
+			graphicsPipeline
+		);
+
+		// Because we defined viewport/scissors to be dynamic
+		// We have to provide them here
+		
+		// Define viewport for rendering
+		// Viewport defines transformations from image to framebuffer
+		// Almost always (0,0) to (width,height)
+		VkViewport viewport{};
+		// Set offset of viewport
+		viewport.x = 0.0f;
+		viewport.y = 0.0;
+		// Set size of viewport
+		// Remember : 
+		// swapchain width/height NOT EQUAL width/height of window
+		viewport.width = static_cast<float>(swapChainExtent.width);
+		viewport.height = static_cast<float>(swapChainExtent.height);
+		// Set depth value range
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		vkCmdSetViewport(
+			commandBuffer,
+			0,	/* index of first viewport to be updated */
+			1,	/* number of viewports to be updated */
+			&viewport
+		);
+
+		// Define scissor for rendering
+		// Scissor defines which regions/pixels will actually be stored 
+		// outside pixels will be discarded (filters them out)
+		VkRect2D scissor{};
+		scissor.offset = { 0,0 };
+		scissor.extent = swapChainExtent;
+
+		vkCmdSetScissor(
+			commandBuffer, 
+			0,	/* index of first scissor to be updated */
+			1,	/* number of scissors to be updated */
+			&scissor
+		);
+
+		vkCmdDraw(
+			commandBuffer,
+			3,	/* number of vertices to draw */
+			1,	/* number of instances to draw, used for instanced rendering */
+			0,	/* offset into the vertex buffer, 
+				   defines lowest value of vertex index */
+			0	/* offset for instanced rendering, 
+				   defines lowest value of instanced index */
+		);
+	}
+	vkCmdEndRenderPass(commandBuffer);
+
+	if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to record command buffer!");
+	}
+}
+
 bool HelloTriangleApp::checkDeviceExtensionSupport(VkPhysicalDevice device)
 {
 	// Enumerate all the available extensions
@@ -1233,6 +1374,9 @@ void HelloTriangleApp::mainLoop()
 
 void HelloTriangleApp::cleanupVulkan()
 {
+	// Destroy command pool
+	vkDestroyCommandPool(device, commandPool, nullptr);
+
 	// Destroy framebuffer objects
 	for (auto framebuffer : swapChainFramebuffers)
 	{
