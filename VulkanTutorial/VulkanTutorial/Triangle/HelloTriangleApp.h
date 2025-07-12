@@ -96,17 +96,22 @@ private:
 			{ 0.125f, 0.25f, 0.5f, 1.0f }
 		} 
 	};
+	// Synchronization objects
+	VkSemaphore imageAvailableSemaphore;	/* image is acquired from the swap chain */
+	VkSemaphore renderFinishedSemaphore;	/* rendering of image finished, presentable */
+	VkFence inFlightFence;					/* one frame is rendered at the time */
 
 	// Run functions
 	void initWindow();
 	void mainLoop();
+	void drawFrame();
 	void cleanup();
 	// Vulkan functions
 	void initVulkan()
 	{
 		createInstance();
-		createSurface();
 		setupDebugMessenger();
+		createSurface();
 		pickPhysicalDevice();
 		CreateLogicalDevice();
 		createSwapChain();
@@ -116,6 +121,7 @@ private:
 		createFramebuffers();
 		createCommandPool();
 		createCommandBuffer();
+		createSyncObjects();
 	}
 	void createInstance();
 	void pickPhysicalDevice();
@@ -127,6 +133,7 @@ private:
 	void createFramebuffers();
 	void createCommandPool();
 	void createCommandBuffer();
+	void createSyncObjects();
 	void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 	VkShaderModule createShaderModule(const std::vector<char>& code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
