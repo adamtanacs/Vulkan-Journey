@@ -24,6 +24,9 @@
 
 #include "ShaderCompiler.h"
 
+// Maximum number of frames rendered simultaneously
+const int MAX_FRAMES_IN_FLIGHT = 2;
+
 // Struct defining supported Queue Families.
 struct QueueFamilyIndices
 {
@@ -90,16 +93,22 @@ private:
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 	VkCommandPool commandPool;	/* Manange memory of buffers/command buffers */
-	VkCommandBuffer commandBuffer; /* Cleaned up once command pool is destroyed */
+	// NOTE : Cleaned up once command pool is destroyed
+	std::vector<VkCommandBuffer> commandBuffers; 
 	VkClearValue clearColor = { 
 		{
 			{ 0.125f, 0.25f, 0.5f, 1.0f }
 		} 
 	};
+	uint32_t currentFrame = 0;
+
 	// Synchronization objects
-	VkSemaphore imageAvailableSemaphore;	/* image is acquired from the swap chain */
-	VkSemaphore renderFinishedSemaphore;	/* rendering of image finished, presentable */
-	VkFence inFlightFence;					/* one frame is rendered at the time */
+	// image is acquired from the swap chain
+	std::vector<VkSemaphore> imageAvailableSemaphores;
+	// rendering of image finished, presentable
+	std::vector<VkSemaphore> renderFinishedSemaphores;
+	// one frame is rendered at the time
+	std::vector<VkFence> inFlightFences;
 
 	// Run functions
 	void initWindow();
