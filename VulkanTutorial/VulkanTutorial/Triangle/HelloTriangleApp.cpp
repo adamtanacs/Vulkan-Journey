@@ -104,6 +104,16 @@ void DestroyDebugUtilsMessengerEXT(
 	}
 }
 
+void HelloTriangleApp::framebufferResizeCallback(
+	GLFWwindow* window, 
+	int width, 
+	int height
+)
+{
+	auto app = reinterpret_cast<HelloTriangleApp*>(glfwGetWindowUserPointer(window));
+	app->framebufferResized = true;
+}
+
 bool HelloTriangleApp::checkValidationLayerSupport()
 {
 	// Return number of global layer properties available
@@ -140,7 +150,7 @@ void HelloTriangleApp::initWindow()
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 	// Tell GLFW its NOT resizeable
-	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	// glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 	// Create a window in GLFW
 	// glfwCreateWindow(
@@ -150,6 +160,11 @@ void HelloTriangleApp::initWindow()
 	// {specify monitor to open on},
 	// {only relevant for OpenGL})
 	window = glfwCreateWindow(WIDTH,HEIGHT,"Vulkan",nullptr,nullptr);
+
+	// Set a pointer towards our application
+	glfwSetWindowUserPointer(window, this);
+	// Set callback for window resize
+	glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 }
 
 void HelloTriangleApp::populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
@@ -502,6 +517,36 @@ void HelloTriangleApp::createSwapChain()
 	// Store format and extent of our swap chain for future use
 	swapChainImageFormat = surfaceFormat.format;
 	swapChainExtent = extent;
+}
+
+void HelloTriangleApp::recreateSwapChain()
+{
+	vkDeviceWaitIdle(device);
+	
+	cleanupSwapChain();
+
+	// Better solution is to pass the old swapchain as the new one
+	createSwapChain();
+	createImageViews();
+	createFramebuffers();
+}
+
+void HelloTriangleApp::cleanupSwapChain()
+{
+	// Destroy swap chain
+	vkDestroySwapchainKHR(device, swapChain, nullptr);
+
+	// Destroy framebuffer objects
+	for (auto framebuffer : swapChainFramebuffers)
+	{
+		vkDestroyFramebuffer(device, framebuffer, nullptr);
+	}
+
+	// Destroy image views
+	for (auto imageView : swapChainImageViews)
+	{
+		vkDestroyImageView(device, imageView, nullptr);
+	}
 }
 
 void HelloTriangleApp::createImageViews()
@@ -1489,11 +1534,24 @@ void HelloTriangleApp::drawFrame()
 
 	// Wait for the previous frame to render
 	vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-	// Reset fences
-	vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
 	uint32_t imageIndex;
-	vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+	VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+	// Handle invalid/suboptimal swap chain
+	if (result == VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		recreateSwapChain();
+		return;
+	}
+	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+	{
+		throw std::runtime_error("[ERROR] : Failed to acquire swap chain image!");
+	}
+
+	// Reset fences
+	// Only reset fence if we are submitting work
+	vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
 	// Reset command buffer to starting state
 	vkResetCommandBuffer(commandBuffers[currentFrame], 0);
@@ -1551,14 +1609,34 @@ void HelloTriangleApp::drawFrame()
 	VkResult res;
 	presentInfo.pResults = &res;
 
-	vkQueuePresentKHR(presentQueue, &presentInfo);
+	result = vkQueuePresentKHR(presentQueue, &presentInfo);
 	
+	// Handle invalid/suboptimal swap chain
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result != VK_SUBOPTIMAL_KHR)
+	{
+		framebufferResized = false;
+		recreateSwapChain();
+	}
+	else if (result != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to acquire swap chain image!");
+	}
+
 	// Advance frame counter
 	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void HelloTriangleApp::cleanupVulkan()
 {
+	// Destroy (grahpics) pipeline
+	vkDestroyPipeline(device, graphicsPipeline, nullptr);
+
+	// Destroy pipeline layout
+	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+
+	// Destroy render pass
+	vkDestroyRenderPass(device, renderPass, nullptr);
+
 	// Destroy synchronization objects
 	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT;++i)
 	{
@@ -1569,32 +1647,10 @@ void HelloTriangleApp::cleanupVulkan()
 		vkDestroyFence(device, inFlightFences[i], nullptr);
 	}
 
+	cleanupSwapChain();
+
 	// Destroy command pool
 	vkDestroyCommandPool(device, commandPool, nullptr);
-
-	// Destroy framebuffer objects
-	for (auto framebuffer : swapChainFramebuffers)
-	{
-		vkDestroyFramebuffer(device, framebuffer, nullptr);
-	}
-
-	// Destroy (grahpics) pipeline
-	vkDestroyPipeline(device, graphicsPipeline, nullptr);
-
-	// Destroy pipeline layout
-	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-
-	// Destroy render pass
-	vkDestroyRenderPass(device, renderPass, nullptr);
-
-	// Destroy image views
-	for (auto imageView : swapChainImageViews)
-	{
-		vkDestroyImageView(device, imageView, nullptr);
-	}
-
-	// Destroy swap chain
-	vkDestroySwapchainKHR(device, swapChain, nullptr);
 
 	// Destroy logical device.
 	vkDestroyDevice(device, nullptr);

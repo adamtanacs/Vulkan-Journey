@@ -103,6 +103,7 @@ private:
 	uint32_t currentFrame = 0;
 
 	// Synchronization objects
+	
 	// image is acquired from the swap chain
 	std::vector<VkSemaphore> imageAvailableSemaphores;
 	// rendering of image finished, presentable
@@ -110,12 +111,22 @@ private:
 	// one frame is rendered at the time
 	std::vector<VkFence> inFlightFences;
 
-	// Run functions
+	bool framebufferResized = false;
+
+	// ----------------------- APP FUNCTIONS -----------------------
+	
 	void initWindow();
 	void mainLoop();
 	void drawFrame();
 	void cleanup();
-	// Vulkan functions
+	
+	// ---------------------- EVENT FUNCTIONS ----------------------
+	
+	// Callback to handle resize event
+	static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
+	
+	// --------------------- VULKAN FUNCTIONS ----------------------
+	
 	void initVulkan()
 	{
 		createInstance();
@@ -136,6 +147,9 @@ private:
 	void pickPhysicalDevice();
 	void CreateLogicalDevice();
 	void createSwapChain();
+	void recreateSwapChain();
+	// Cleanup swap chain and all associated objects (framebuffers, imageviews)
+	void cleanupSwapChain();
 	void createImageViews();
 	void createGraphicsPipeline();
 	void createRenderPass();
