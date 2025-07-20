@@ -1067,6 +1067,103 @@ void HelloTriangleApp::createCommandPool()
 	}
 }
 
+void HelloTriangleApp::createVertexBuffer()
+{
+	// Buffers are regions of memory read and used by the GPU
+	// They can store (vertex) data, which is allocated by the programmer
+
+	// -------------------------- BUFFER CREATION ---------------------------
+
+	// Define our buffers properties
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.sType		= VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	// Define size of our buffer (in bytes)
+	bufferInfo.size			= sizeof(vertices[0]) * vertices.size();
+	// Define how we want to use our buffer
+	// a buffer can have multiple use, defined by bitwise or
+	bufferInfo.usage		= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	// Define ownership of our buffer (exactly like images in swap chain)
+	bufferInfo.sharingMode	= VK_SHARING_MODE_EXCLUSIVE;
+	// Flags is used to define sparse buffer memory
+	// (spares = consists of multiple allocated partitions)
+	// ------------------------------- 256 kb buffer -------------------------------
+	// - VkDevice Memory A -|------- VkDevice Memory B -------|- VkDevice Memory C -
+	// --- 64 KB S.Block ---|- 64 KB S.Block - 64 KB S.Block -|--- 64 KB S.Block ---
+	bufferInfo.flags		= 0;
+
+	if (vkCreateBuffer(device, &bufferInfo, nullptr, &vertexBuffer) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create vertex buffer!");
+	}
+
+	// ------------------------- MEMORY ALLOCATION -------------------------
+
+	// First we need to query the memory requirements
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(device, vertexBuffer, &memRequirements);
+
+	// Define the properties for VRAM allocation
+	VkMemoryAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	// Define the size of our allocated memory
+	allocInfo.allocationSize = memRequirements.size;
+	// Define the memory we want to use by giving its index
+	// We check for:
+	// 1. The type of memory we need
+	// 2. The properties we want the memory to have
+	allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+		// make memory data match the host memory 
+		// HOWEVER at the cost of (not significant) performance
+		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+	);
+
+	if (vkAllocateMemory(device, &allocInfo, nullptr, &vertexBufferMemory) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to allocate vertex buffer memory!");
+	}
+
+	// Bind the memory to our buffer
+	vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 
+		0 /* offset of our memory, if non-zero use memRequirements.alignment */
+	);
+
+	// We fill up our buffer with (vertex) data
+	void* data;
+	// Size can be set to VK_WHOLE_SIZE to map all of the memory
+	vkMapMemory(device, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
+	// Other option to make memory "coherent"
+	// Use vkInvalidateMappedMemoryRanges before reading from deviceMemory
+	memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+	// Use vkFlushMappedMemoryRanges after writing to deviceMemory
+	vkUnmapMemory(device, vertexBufferMemory);
+}
+
+uint32_t HelloTriangleApp::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+{
+	// We need to query info what types are available for our physical device 
+	VkPhysicalDeviceMemoryProperties memProperties;
+	// This struct contains to arrays
+	// memoryTypes	: type of the memory heap in question
+	// memoryHeaps	: deducated VRAM or swap space in RAM for when VRAM runs out
+	// (here we only focus on the type, 
+	//  but different heaps can have different performances)
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+	{
+		if (typeFilter & (1 << i) && /* Check for a suitable memory type*/
+			// Check if our memory also has the required properties for us
+			// (Example: map it to CPU or write to it)
+			(memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+		{
+			return i;
+		}
+	}
+
+	throw std::runtime_error("[ERROR] : Failed to find suitable memory type!");
+}
+
 void HelloTriangleApp::createCommandBuffer()
 {
 	// Create multiple command buffers
@@ -1224,9 +1321,13 @@ void HelloTriangleApp::recordCommandBuffer(
 			&scissor
 		);
 
+		VkBuffer vertexBuffers[] = { vertexBuffer };
+		VkDeviceSize offsets[] = { 0 };
+		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+
 		vkCmdDraw(
 			commandBuffer,
-			3,	/* number of vertices to draw */
+			static_cast<uint32_t>(vertices.size()),	/* number of vertices to draw */
 			1,	/* number of instances to draw, used for instanced rendering */
 			0,	/* offset into the vertex buffer,
 				   defines lowest value of vertex index */
@@ -1653,6 +1754,10 @@ void HelloTriangleApp::cleanupVulkan()
 	}
 
 	cleanupSwapChain();
+
+	// Destroy buffers and deallocate their memory spaces
+	vkDestroyBuffer(device, vertexBuffer, nullptr);
+	vkFreeMemory(device, vertexBufferMemory, nullptr);
 
 	// Destroy command pool
 	vkDestroyCommandPool(device, commandPool, nullptr);

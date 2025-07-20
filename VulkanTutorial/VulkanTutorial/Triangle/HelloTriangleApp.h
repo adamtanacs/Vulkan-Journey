@@ -111,6 +111,9 @@ private:
 		{{-0.5f, 0.5f},	{0.0f, 0.0f, 1.0f}}
 	};
 
+	VkBuffer vertexBuffer;
+	VkDeviceMemory vertexBufferMemory;
+
 	// ------------------ SYNCHRONIZATION OBJECTS ------------------
 	
 	// image is acquired from the swap chain
@@ -149,6 +152,7 @@ private:
 		createGraphicsPipeline();
 		createFramebuffers();
 		createCommandPool();
+		createVertexBuffer();
 		createCommandBuffer();
 		createSyncObjects();
 	}
@@ -164,11 +168,13 @@ private:
 	void createRenderPass();
 	void createFramebuffers();
 	void createCommandPool();
+	void createVertexBuffer();
 	void createCommandBuffer();
 	void createSyncObjects();
 	void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
 	VkShaderModule createShaderModule(const std::vector<char>& code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 	bool isDeviceSuitable(VkPhysicalDevice device);
