@@ -137,6 +137,7 @@
     </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ShaderCompiler.cpp" />
+    <ClCompile Include="Vertex.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HelloTriangleApp.h">
@@ -144,6 +145,7 @@
       </ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="ShaderCompiler.h" />
+    <ClInclude Include="Vertex.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shader.frag" />

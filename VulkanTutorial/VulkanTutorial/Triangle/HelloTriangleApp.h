@@ -23,6 +23,7 @@
 #include <algorithm>
 
 #include "ShaderCompiler.h"
+#include "Vertex.h"
 
 // Maximum number of frames rendered simultaneously
 const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -102,7 +103,15 @@ private:
 	};
 	uint32_t currentFrame = 0;
 
-	// Synchronization objects
+	// ------------------------- VERTICES --------------------------
+
+	const std::vector<Vertex> vertices = {
+		{{0.0f, -0.5f},	{1.0f, 0.0f, 0.0f}},
+		{{0.5f, 0.5f},	{0.0f, 1.0f, 0.0f}},
+		{{-0.5f, 0.5f},	{0.0f, 0.0f, 1.0f}}
+	};
+
+	// ------------------ SYNCHRONIZATION OBJECTS ------------------
 	
 	// image is acquired from the swap chain
 	std::vector<VkSemaphore> imageAvailableSemaphores;
