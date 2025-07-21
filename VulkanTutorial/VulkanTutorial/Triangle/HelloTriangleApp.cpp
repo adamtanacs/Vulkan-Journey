@@ -1164,7 +1164,8 @@ void HelloTriangleApp::createVertexBuffer()
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, /* Source buffer of our data */
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 		stagingBuffer,
-		stagingBufferMemory
+		stagingBufferMemory,
+		VK_SHARING_MODE_CONCURRENT
 	);
 
 	void* data;
@@ -1220,16 +1221,24 @@ void HelloTriangleApp::createBuffer(
 	VkBufferUsageFlags usage, 
 	VkMemoryPropertyFlags properties, 
 	VkBuffer& buffer, 
-	VkDeviceMemory& bufferMemory
+	VkDeviceMemory& bufferMemory,
+	VkSharingMode sharingMode
 )
 {
 	VkBufferCreateInfo bufferInfo{};
 	bufferInfo.sType		= VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferInfo.size			= size;
 	bufferInfo.usage		= usage;
-	bufferInfo.sharingMode =
-		VK_SHARING_MODE_EXCLUSIVE;
-		//VK_SHARING_MODE_CONCURRENT; /* so we can use transfer queue */
+	//VK_SHARING_MODE_CONCURRENT; /* so we can use transfer queue */
+	bufferInfo.sharingMode = sharingMode;
+	
+	QueueFamilyIndices queueFamilies = findQueueFamilies(physicalDevice);
+	std::vector<uint32_t> queues = {
+		queueFamilies.graphicsFamily.value(),
+		queueFamilies.transferFamily.value()
+	};
+	bufferInfo.queueFamilyIndexCount = queues.size();
+	bufferInfo.pQueueFamilyIndices = queues.data();
 
 	if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
 	{
@@ -1265,9 +1274,7 @@ void HelloTriangleApp::copyBuffer(
 	VkCommandBufferAllocateInfo allocInfo{};
 	allocInfo.sType		= VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.level		= VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandPool =
-		commandPool;
-		//transferCommandPool;
+	allocInfo.commandPool = transferCommandPool;
 	allocInfo.commandBufferCount = 1;
 
 	VkCommandBuffer commandBuffer;
@@ -1297,8 +1304,7 @@ void HelloTriangleApp::copyBuffer(
 	submitInfo.pCommandBuffers		= &commandBuffer;
 
 	vkQueueSubmit(
-		graphicsQueue,
-		//transferQueue,
+		transferQueue,
 		1,
 		&submitInfo,
 		VK_NULL_HANDLE
@@ -1309,12 +1315,11 @@ void HelloTriangleApp::copyBuffer(
 	//	  (useful if we want to transfer multiple buffer simultaneously)
 	// 2. Wait for the queue to become idle
 	vkQueueWaitIdle(
-		graphicsQueue
-		//transferQueue
+		transferQueue
 	);
 
 	// Clean up command buffer after one-time use
-	vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+	vkFreeCommandBuffers(device, transferCommandPool, 1, &commandBuffer);
 }
 
 void HelloTriangleApp::createCommandBuffer()
