@@ -366,8 +366,7 @@ void HelloTriangleApp::createLogicalDevice()
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos{};
 	std::set<uint32_t> uniqueQueueFamilies = {
 		indices.graphicsFamily.value(),
-		indices.presentFamily.value(),
-		indices.transferFamily.value()
+		indices.presentFamily.value()
 	};
 	
 	// Assing priority to queue (even for single one).
@@ -425,7 +424,6 @@ void HelloTriangleApp::createLogicalDevice()
 	{
 		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
 		vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
-		vkGetDeviceQueue(device, indices.transferFamily.value(), 0, &transferQueue);
 	}
 }
 
@@ -1067,17 +1065,6 @@ void HelloTriangleApp::createCommandPool()
 	{
 		throw std::runtime_error("[ERROR] : Failed to create graphics queue command pool!");
 	}
-
-	// Create command pool for transfer queue
-	poolInfo = {};
-	poolInfo.sType	= VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	poolInfo.flags	= VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	poolInfo.queueFamilyIndex = queueFamilyIndices.transferFamily.value();
-
-	if (vkCreateCommandPool(device, &poolInfo, nullptr, &transferCommandPool) != VK_SUCCESS)
-	{
-		throw std::runtime_error("[ERROR] : Failed to create transfer queue command pool!");
-	}
 }
 
 void HelloTriangleApp::oldCreateVertexBuffer()
@@ -1185,6 +1172,40 @@ void HelloTriangleApp::createVertexBuffer()
 
 	// Copy over our data from the staging buffer
 	copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+	vkDestroyBuffer(device, stagingBuffer, nullptr);
+	vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
+
+void HelloTriangleApp::createIndexBuffer()
+{
+	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+
+	createBuffer(
+		bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer,
+		stagingBufferMemory
+	);
+
+	void* data;
+	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+	memcpy(data, indices.data(), (size_t)bufferSize);
+	vkUnmapMemory(device, stagingBufferMemory);
+
+	createBuffer(
+		bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		indexBuffer,
+		indexBufferMemory
+	);
+
+	copyBuffer(stagingBuffer, indexBuffer, bufferSize);
 
 	vkDestroyBuffer(device, stagingBuffer, nullptr);
 	vkFreeMemory(device, stagingBufferMemory, nullptr);
@@ -1478,14 +1499,15 @@ void HelloTriangleApp::recordCommandBuffer(
 		VkDeviceSize offsets[] = { 0 };
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-		vkCmdDraw(
+		vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+		vkCmdDrawIndexed(
 			commandBuffer,
-			static_cast<uint32_t>(vertices.size()),	/* number of vertices to draw */
-			1,	/* number of instances to draw, used for instanced rendering */
-			0,	/* offset into the vertex buffer,
-				   defines lowest value of vertex index */
-			0	/* offset for instanced rendering,
-				   defines lowest value of instanced index */
+			static_cast<uint32_t>(indices.size()),
+			1,
+			0,
+			0,
+			0
 		);
 	}
 	vkCmdEndRenderPass(commandBuffer);
@@ -1672,14 +1694,6 @@ QueueFamilyIndices HelloTriangleApp::findQueueFamilies(VkPhysicalDevice device)
 		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
 		{
 			indices.graphicsFamily = i;
-		}
-
-		// Find a queue family that supports transfer commands, 
-		// BUT is not the graphics queue.
-		if ((queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
-			!(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT))
-		{
-			indices.transferFamily = i;
 		}
 
 		// Check if queue family supports presenting to our window surface.
@@ -1920,9 +1934,11 @@ void HelloTriangleApp::cleanupVulkan()
 	vkDestroyBuffer(device, vertexBuffer, nullptr);
 	vkFreeMemory(device, vertexBufferMemory, nullptr);
 
+	vkDestroyBuffer(device, indexBuffer, nullptr);
+	vkFreeMemory(device, indexBufferMemory, nullptr);
+
 	// Destroy command pool
 	vkDestroyCommandPool(device, commandPool, nullptr);
-	vkDestroyCommandPool(device, transferCommandPool, nullptr);
 
 	// Destroy logical device.
 	vkDestroyDevice(device, nullptr);

@@ -34,13 +34,11 @@ struct QueueFamilyIndices
 	// Graphics command support.
 	std::optional<uint32_t> graphicsFamily;
 	std::optional<uint32_t> presentFamily;
-	std::optional<uint32_t> transferFamily;
 
 	bool isComplete()
 	{
 		return graphicsFamily.has_value() &&
-			presentFamily.has_value() &&
-			transferFamily.has_value();
+			presentFamily.has_value();
 	}
 };
 
@@ -97,7 +95,6 @@ private:
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
 	VkCommandPool commandPool;	/* Manange memory of command buffers */
-	VkCommandPool transferCommandPool; /* Manage memory of buffers */
 	// NOTE : Cleaned up once command pool is destroyed
 	std::vector<VkCommandBuffer> commandBuffers; 
 	VkClearValue clearColor = { 
@@ -107,16 +104,24 @@ private:
 	};
 	uint32_t currentFrame = 0;
 
-	// ------------------------- VERTICES --------------------------
+	// ------------------------- MESH DATA -------------------------
 
 	const std::vector<Vertex> vertices = {
-		{{0.0f, -0.5f},	{1.0f, 0.0f, 0.0f}},
-		{{0.5f, 0.5f},	{0.0f, 1.0f, 0.0f}},
-		{{-0.5f, 0.5f},	{0.0f, 0.0f, 1.0f}}
+		{{-0.5f, -0.5f},	{1.0f, 0.0f, 0.0f}},
+		{{0.5f, -0.5f},		{0.0f, 1.0f, 0.0f}},
+		{{0.5f, 0.5f},		{0.0f, 0.0f, 1.0f}},
+		{{-0.5f, 0.5f},		{1.0f, 1.0f, 1.0f}}
+	};
+
+	const std::vector<uint32_t> indices = {
+		0, 1, 2,
+		2, 3, 0
 	};
 
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
+	VkBuffer indexBuffer;
+	VkDeviceMemory indexBufferMemory;
 
 	// ------------------ SYNCHRONIZATION OBJECTS ------------------
 	
@@ -157,6 +162,7 @@ private:
 		createFramebuffers();
 		createCommandPool();
 		createVertexBuffer();
+		createIndexBuffer();
 		// oldCreateVertexBuffer();
 		createCommandBuffer();
 		createSyncObjects();
@@ -175,6 +181,7 @@ private:
 	void createCommandPool();
 	void oldCreateVertexBuffer();
 	void createVertexBuffer();
+	void createIndexBuffer();
 	void createCommandBuffer();
 	void createSyncObjects();
 	void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
