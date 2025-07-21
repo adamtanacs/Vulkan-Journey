@@ -356,7 +356,7 @@ void HelloTriangleApp::pickPhysicalDevice()
 	}
 }
 
-void HelloTriangleApp::CreateLogicalDevice()
+void HelloTriangleApp::createLogicalDevice()
 {
 	// Logical Device : interface for physical device
 
@@ -366,7 +366,8 @@ void HelloTriangleApp::CreateLogicalDevice()
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos{};
 	std::set<uint32_t> uniqueQueueFamilies = {
 		indices.graphicsFamily.value(),
-		indices.presentFamily.value()
+		indices.presentFamily.value(),
+		indices.transferFamily.value()
 	};
 	
 	// Assing priority to queue (even for single one).
@@ -424,6 +425,7 @@ void HelloTriangleApp::CreateLogicalDevice()
 	{
 		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
 		vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+		vkGetDeviceQueue(device, indices.transferFamily.value(), 0, &transferQueue);
 	}
 }
 
@@ -1063,11 +1065,22 @@ void HelloTriangleApp::createCommandPool()
 
 	if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS)
 	{
-		throw std::runtime_error("[ERROR] : Failed to create command pool!");
+		throw std::runtime_error("[ERROR] : Failed to create graphics queue command pool!");
+	}
+
+	// Create command pool for transfer queue
+	poolInfo = {};
+	poolInfo.sType	= VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	poolInfo.flags	= VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	poolInfo.queueFamilyIndex = queueFamilyIndices.transferFamily.value();
+
+	if (vkCreateCommandPool(device, &poolInfo, nullptr, &transferCommandPool) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create transfer queue command pool!");
 	}
 }
 
-void HelloTriangleApp::createVertexBuffer()
+void HelloTriangleApp::oldCreateVertexBuffer()
 {
 	// Buffers are regions of memory read and used by the GPU
 	// They can store (vertex) data, which is allocated by the programmer
@@ -1139,6 +1152,44 @@ void HelloTriangleApp::createVertexBuffer()
 	vkUnmapMemory(device, vertexBufferMemory);
 }
 
+void HelloTriangleApp::createVertexBuffer()
+{
+	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+	// First we create a staging buffer, to store our data on the CPU
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	createBuffer(
+		bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, /* Source buffer of our data */
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer,
+		stagingBufferMemory
+	);
+
+	void* data;
+	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+	memcpy(data, vertices.data(), (size_t)bufferSize);
+	vkUnmapMemory(device, stagingBufferMemory);
+
+	// Then we create the vertex buffer to store our data
+	// More about memory property bits : https://registry.khronos.org/vulkan/specs/latest/man/html/VkMemoryPropertyFlagBits.html
+	createBuffer(
+		bufferSize,
+		// Destination buffer for our data
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, /* buffer data is most efficient for device usage */
+		vertexBuffer,
+		vertexBufferMemory
+	);
+
+	// Copy over our data from the staging buffer
+	copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+	vkDestroyBuffer(device, stagingBuffer, nullptr);
+	vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
+
 uint32_t HelloTriangleApp::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
 {
 	// We need to query info what types are available for our physical device 
@@ -1162,6 +1213,108 @@ uint32_t HelloTriangleApp::findMemoryType(uint32_t typeFilter, VkMemoryPropertyF
 	}
 
 	throw std::runtime_error("[ERROR] : Failed to find suitable memory type!");
+}
+
+void HelloTriangleApp::createBuffer(
+	VkDeviceSize size, 
+	VkBufferUsageFlags usage, 
+	VkMemoryPropertyFlags properties, 
+	VkBuffer& buffer, 
+	VkDeviceMemory& bufferMemory
+)
+{
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.sType		= VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size			= size;
+	bufferInfo.usage		= usage;
+	bufferInfo.sharingMode =
+		VK_SHARING_MODE_EXCLUSIVE;
+		//VK_SHARING_MODE_CONCURRENT; /* so we can use transfer queue */
+
+	if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create buffer!");
+	}
+
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo{};
+	allocInfo.sType				= VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize	= memRequirements.size;
+	allocInfo.memoryTypeIndex	= findMemoryType(memRequirements.memoryTypeBits, properties);
+
+	// NOTE : for larger number of buffer allocations 
+	// its advised to use custom allocator class that splits up data using offsets
+	// One good memory allocator: https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+	if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to allocate buffer memory!");
+	}
+
+	vkBindBufferMemory(device, buffer, bufferMemory, 0);
+}
+
+void HelloTriangleApp::copyBuffer(
+	VkBuffer srcBuffer, 
+	VkBuffer dstBuffer, 
+	VkDeviceSize size
+)
+{
+	// Memory transfers are executed using command buffers
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType		= VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.level		= VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandPool =
+		commandPool;
+		//transferCommandPool;
+	allocInfo.commandBufferCount = 1;
+
+	VkCommandBuffer commandBuffer;
+	vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+	VkCommandBufferBeginInfo beginInfo{};
+	beginInfo.sType		= VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	// We are going to use the buffer once
+	beginInfo.flags		= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+	vkBeginCommandBuffer(commandBuffer, &beginInfo);
+	{
+		// Define the region properties we want to copy (can be multiple at once)
+		VkBufferCopy copyRegion{};
+		copyRegion.srcOffset	= 0;
+		copyRegion.dstOffset	= 0;
+		copyRegion.size			= size;  
+
+		// Copy over regions of data from src to dst buffer
+		vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+	}
+	vkEndCommandBuffer(commandBuffer);
+
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType				= VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount	= 1;
+	submitInfo.pCommandBuffers		= &commandBuffer;
+
+	vkQueueSubmit(
+		graphicsQueue,
+		//transferQueue,
+		1,
+		&submitInfo,
+		VK_NULL_HANDLE
+	);
+
+	// There are 2 options to wait here
+	// 1. Use a fence and wait for it here 
+	//	  (useful if we want to transfer multiple buffer simultaneously)
+	// 2. Wait for the queue to become idle
+	vkQueueWaitIdle(
+		graphicsQueue
+		//transferQueue
+	);
+
+	// Clean up command buffer after one-time use
+	vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 }
 
 void HelloTriangleApp::createCommandBuffer()
@@ -1521,6 +1674,14 @@ QueueFamilyIndices HelloTriangleApp::findQueueFamilies(VkPhysicalDevice device)
 			indices.graphicsFamily = i;
 		}
 
+		// Find a queue family that supports transfer commands, 
+		// BUT is not the graphics queue.
+		if ((queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+			!(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT))
+		{
+			indices.transferFamily = i;
+		}
+
 		// Check if queue family supports presenting to our window surface.
 		VkBool32 presentSupport = false;
 		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
@@ -1761,6 +1922,7 @@ void HelloTriangleApp::cleanupVulkan()
 
 	// Destroy command pool
 	vkDestroyCommandPool(device, commandPool, nullptr);
+	vkDestroyCommandPool(device, transferCommandPool, nullptr);
 
 	// Destroy logical device.
 	vkDestroyDevice(device, nullptr);

@@ -34,11 +34,13 @@ struct QueueFamilyIndices
 	// Graphics command support.
 	std::optional<uint32_t> graphicsFamily;
 	std::optional<uint32_t> presentFamily;
-	
+	std::optional<uint32_t> transferFamily;
 
 	bool isComplete()
 	{
-		return graphicsFamily.has_value() && presentFamily.has_value();
+		return graphicsFamily.has_value() &&
+			presentFamily.has_value() &&
+			transferFamily.has_value();
 	}
 };
 
@@ -82,6 +84,7 @@ private:
 	VkDevice device; // Logical device
 	VkQueue graphicsQueue;
 	VkQueue presentQueue; /* Presentation queue implies support for swapchains */
+	VkQueue transferQueue; /* Buffer data transfer queue */
 
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapChain;
@@ -93,7 +96,8 @@ private:
 	VkRenderPass renderPass;
 	VkPipelineLayout pipelineLayout;
 	VkPipeline graphicsPipeline;
-	VkCommandPool commandPool;	/* Manange memory of buffers/command buffers */
+	VkCommandPool commandPool;	/* Manange memory of command buffers */
+	VkCommandPool transferCommandPool; /* Manage memory of buffers */
 	// NOTE : Cleaned up once command pool is destroyed
 	std::vector<VkCommandBuffer> commandBuffers; 
 	VkClearValue clearColor = { 
@@ -145,7 +149,7 @@ private:
 		setupDebugMessenger();
 		createSurface();
 		pickPhysicalDevice();
-		CreateLogicalDevice();
+		createLogicalDevice();
 		createSwapChain();
 		createImageViews();
 		createRenderPass();
@@ -153,12 +157,13 @@ private:
 		createFramebuffers();
 		createCommandPool();
 		createVertexBuffer();
+		// oldCreateVertexBuffer();
 		createCommandBuffer();
 		createSyncObjects();
 	}
 	void createInstance();
 	void pickPhysicalDevice();
-	void CreateLogicalDevice();
+	void createLogicalDevice();
 	void createSwapChain();
 	void recreateSwapChain();
 	// Cleanup swap chain and all associated objects (framebuffers, imageviews)
@@ -168,6 +173,7 @@ private:
 	void createRenderPass();
 	void createFramebuffers();
 	void createCommandPool();
+	void oldCreateVertexBuffer();
 	void createVertexBuffer();
 	void createCommandBuffer();
 	void createSyncObjects();
@@ -175,6 +181,8 @@ private:
 	VkShaderModule createShaderModule(const std::vector<char>& code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 	bool isDeviceSuitable(VkPhysicalDevice device);
