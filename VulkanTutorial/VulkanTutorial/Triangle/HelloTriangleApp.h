@@ -7,6 +7,10 @@
 //#define GLFW_EXPOSE_NATIVE_WIN32
 //#include <GLFW/glfw3native.h>
 
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -21,6 +25,7 @@
 #include <cstdint>
 #include <limits>
 #include <algorithm>
+#include <chrono>
 
 #include "ShaderCompiler.h"
 #include "Vertex.h"
@@ -47,6 +52,28 @@ struct SwapChainSupportDetails {
 	std::vector<VkSurfaceFormatKHR> formats;	/*Surface formats (pixel format, color space)*/
 	std::vector<VkPresentModeKHR> presentModes;	/*Available presentation modes*/
 };
+
+struct UniformBufferObject {
+	alignas(16) glm::mat4 model;	/* 64 bytes */
+	alignas(16) glm::mat4 view;		/* 64 bytes */
+	alignas(16) glm::mat4 proj;		/* 64 bytes */
+};
+
+// --------------------- VERY IMPORTANT ---------------------
+// Alignment requirements
+// Vulkan expects data to be aligned in memory in a specific way
+// For example:
+// Scalars (int, uint, float)		: N		(= 4	bytes for 32 bit floats)
+// vec2								: 2N	(= 8	bytes)
+// vec3 or vec4						: 4N	(= 16	bytes)
+// nested structs					: base alignment of its members 
+//									  rounded up to a multiple of 16
+// mat4								: same alignment as vec4
+// For more : https://docs.vulkan.org/spec/latest/chapters/interfaces.html#interfaces-resources-layout
+// How to solve alignment issues?
+// 1. #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES (breaks down with nested structs)
+// 2. alignas() macro	(explicite by effective)
+
 
 class HelloTriangleApp
 {
@@ -104,6 +131,13 @@ private:
 	};
 	uint32_t currentFrame = 0;
 
+	// ---------------------- DESCRIPTOR DATA ----------------------
+
+	VkDescriptorPool descriptorPool;
+
+	VkDescriptorSetLayout descriptorSetLayout;
+	std::vector<VkDescriptorSet> descriptorSets;
+
 	// ------------------------- MESH DATA -------------------------
 
 	const std::vector<Vertex> vertices = {
@@ -118,10 +152,15 @@ private:
 		2, 3, 0
 	};
 
+	// -------------------------- BUFFERS --------------------------
+
 	VkBuffer vertexBuffer;
 	VkDeviceMemory vertexBufferMemory;
 	VkBuffer indexBuffer;
 	VkDeviceMemory indexBufferMemory;
+	std::vector<VkBuffer> uniformBuffers;
+	std::vector<VkDeviceMemory> uniformBuffersMemory;
+	std::vector<void*> uniformBuffersMapped;
 
 	// ------------------ SYNCHRONIZATION OBJECTS ------------------
 	
@@ -158,11 +197,15 @@ private:
 		createSwapChain();
 		createImageViews();
 		createRenderPass();
+		createDescriptorSetLayout();
 		createGraphicsPipeline();
 		createFramebuffers();
 		createCommandPool();
 		createVertexBuffer();
 		createIndexBuffer();
+		createUniformBuffers();
+		createDescriptorPool();
+		createDescriptorSets();
 		// oldCreateVertexBuffer();
 		createCommandBuffer();
 		createSyncObjects();
@@ -173,8 +216,11 @@ private:
 	void createSwapChain();
 	void recreateSwapChain();
 	// Cleanup swap chain and all associated objects (framebuffers, imageviews)
+	void cleanupUniformBuffers();
 	void cleanupSwapChain();
 	void createImageViews();
+	void createDescriptorSetLayout();
+	void createDescriptorSets();
 	void createGraphicsPipeline();
 	void createRenderPass();
 	void createFramebuffers();
@@ -182,6 +228,8 @@ private:
 	void oldCreateVertexBuffer();
 	void createVertexBuffer();
 	void createIndexBuffer();
+	void createUniformBuffers();
+	void createDescriptorPool();
 	void createCommandBuffer();
 	void createSyncObjects();
 	void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
@@ -190,6 +238,7 @@ private:
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+	void updateUniformBuffer(uint32_t currentImage);
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 	bool isDeviceSuitable(VkPhysicalDevice device);

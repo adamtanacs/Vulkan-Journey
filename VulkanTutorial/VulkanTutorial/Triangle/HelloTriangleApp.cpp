@@ -586,6 +586,83 @@ void HelloTriangleApp::createImageViews()
 	}
 }
 
+void HelloTriangleApp::createDescriptorSetLayout()
+{
+	// Define descriptor set layout binding properties
+	VkDescriptorSetLayoutBinding uboLayoutBinding{};
+	uboLayoutBinding.binding			= 0; /* used for referencing in shader */
+	// Set the type of our stored resource
+	// (for more : https://registry.khronos.org/vulkan/specs/latest/man/html/VkDescriptorType.html)
+	uboLayoutBinding.descriptorType		= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	uboLayoutBinding.descriptorCount	= 1;
+	// Set which stages of the (graphics) pipeline we want to use it
+	uboLayoutBinding.stageFlags			= VK_SHADER_STAGE_VERTEX_BIT;
+	// Only related for image sampling descriptors
+	uboLayoutBinding.pImmutableSamplers = nullptr;
+
+	// Define descriptor set layout properties
+	VkDescriptorSetLayoutCreateInfo layoutInfo{};
+	layoutInfo.sType					= VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	// Defining bindings of our descriptor set
+	layoutInfo.bindingCount				= 1;
+	layoutInfo.pBindings				= &uboLayoutBinding;
+
+	if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create descriptor set layout!");
+	}
+}
+
+void HelloTriangleApp::createDescriptorSets()
+{
+	// Allocate a descriptor set layout for each frames in flight
+	std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+	
+	// Define allocation of descriptor sets
+	VkDescriptorSetAllocateInfo allocInfo{};
+	allocInfo.sType					= VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool		= descriptorPool;
+	allocInfo.descriptorSetCount	= static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	allocInfo.pSetLayouts			= layouts.data();
+
+	descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+	if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to allocate descriptor sets!");
+	}
+
+	// Populate allocated descriptor sets
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		VkDescriptorBufferInfo bufferInfo{};
+		bufferInfo.buffer = uniformBuffers[i];			/* point to data */
+		bufferInfo.offset = 0;							/* offset of data */
+		// For whole buffer rewrite: VK_WHOLE_SIZE
+		bufferInfo.range = sizeof(UniformBufferObject);	/* size of our data */
+
+		// Updating configurations of descriptors
+		VkWriteDescriptorSet descriptorWrite{};
+		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrite.dstSet = descriptorSets[i];
+		descriptorWrite.dstBinding = 0;
+		// Because descriptor sets can be arrays
+		descriptorWrite.dstArrayElement = 0;
+		// We need to specify descriptor type again
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		// Also need to specify the number of descriptors
+		// because we can update multiple types of buffers
+		descriptorWrite.descriptorCount = 1;
+		// Reference an array of {descriptorCount} size
+		// to configure our descriptors
+		descriptorWrite.pBufferInfo = &bufferInfo;	/* reference buffer data */
+		descriptorWrite.pImageInfo = nullptr;		/* reference image data */
+		descriptorWrite.pTexelBufferView = nullptr;		/* reference buffer view */
+
+		// There is also the option to copy entire descriptors
+		vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+	}
+}
+
 void HelloTriangleApp::createGraphicsPipeline()
 {
 	// Graphics pipeline: sequence of operations, takes in vertices/textures and renders them
@@ -730,7 +807,7 @@ void HelloTriangleApp::createGraphicsPipeline()
 	// VK_FRONT_FACE_COUNTER_CLOCKWISE	: triangle positive area is front-facing
 	// VK_FRONT_FACE_CLOCKWISE			: triangle negative area is front-facing
 	// positive/negative are calculation : https://registry.khronos.org/vulkan/specs/latest/man/html/VkFrontFace.html
-	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	// We can also add/biasing for depth values (example: shadow mapping)
 	rasterizer.depthBiasEnable = VK_FALSE;
 	rasterizer.depthBiasConstantFactor = 0.0f;
@@ -831,8 +908,9 @@ void HelloTriangleApp::createGraphicsPipeline()
 	// Uniform values: dynamic state variables that can be changed at draw time
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 0;
-	pipelineLayoutInfo.pSetLayouts = nullptr;
+	// Set descriptor set layouts we want to use
+	pipelineLayoutInfo.setLayoutCount = 1;
+	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 	pipelineLayoutInfo.pushConstantRangeCount = 0;
 	pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
@@ -1211,6 +1289,56 @@ void HelloTriangleApp::createIndexBuffer()
 	vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
+void HelloTriangleApp::createUniformBuffers()
+{
+	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+	// We create an UBO for each and every frame in flight
+	uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+	uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+	uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+	{
+		createBuffer(
+			bufferSize,
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			uniformBuffers[i],
+			uniformBuffersMemory[i]
+		);
+
+		// "Persistent mapping" works on all Vulkan implementations
+		vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
+	}
+}
+
+void HelloTriangleApp::createDescriptorPool()
+{
+	// Descriptor sets need to be created through descriptor pools
+
+	// Define descriptor pool size and type
+	VkDescriptorPoolSize poolSize{};
+	poolSize.type				= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSize.descriptorCount	= static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+	// Define descriptor pool properties
+	VkDescriptorPoolCreateInfo poolInfo{};
+	poolInfo.sType			= VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount	= 1;
+	// Also define maximum count of descriptor sets
+	poolInfo.maxSets		= static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	poolInfo.pPoolSizes		= &poolSize;
+	// Also has a flag for whether individial descriptor sets can be freed or not
+	// VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
+
+	if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create descriptor pool!");
+	}
+}
+
 uint32_t HelloTriangleApp::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
 {
 	// We need to query info what types are available for our physical device 
@@ -1501,6 +1629,17 @@ void HelloTriangleApp::recordCommandBuffer(
 
 		vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
+		vkCmdBindDescriptorSets(
+			commandBuffer,
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			pipelineLayout,
+			0,	/* index of the first descriptor set */
+			1,	/* count of the descriptor sets we want to use */
+			&descriptorSets[currentFrame],	/* array of descriptor sets itself */
+			0,		/* offset for dynamic descriptors */
+			nullptr
+		);
+
 		vkCmdDrawIndexed(
 			commandBuffer,
 			static_cast<uint32_t>(indices.size()),
@@ -1762,6 +1901,43 @@ void HelloTriangleApp::mainLoop()
 	vkDeviceWaitIdle(device);
 }
 
+void HelloTriangleApp::updateUniformBuffer(uint32_t currentImage)
+{
+	// Calculate the time between rendering frames
+	static auto startTime = std::chrono::high_resolution_clock::now();
+
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+	UniformBufferObject ubo{};
+
+	ubo.model = glm::rotate(
+		glm::identity<glm::mat4>(),		/* Base matrix */
+		time * glm::radians(90.0f),		/* Rotation in radians */
+		glm::vec3(0.0f, 0.0f, 1.0f)		/* Vector we want to rotate our camera around */
+	);
+	ubo.view = glm::lookAt(
+		glm::vec3(2.0f, 2.0f, 2.0f),	/* Camera position */
+		glm::vec3(0.0f, 0.0f, 0.0f),	/* Camera focus point */
+		glm::vec3(0.0f, 0.0f, 1.0f)		/* Camera up vector */
+	);
+	ubo.proj = glm::perspective(
+		glm::radians(45.0f),	/* Field of view on the Y axis */
+		// Aspect of our view, important because the window size can change
+		swapChainExtent.width / (float) swapChainExtent.height,
+		0.1f,	/* Near Z value */
+		10.0f	/* Far Z value */
+	);
+	// Because GLM was designed for OpenGL originally
+	// We need to invert Y coordinates in clip space
+	// If don't image is rendered upside-down
+	ubo.proj[1][1] *= -1;
+
+	// This method is not the most efficient
+	// Most efficient is "push constants"
+	memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+}
+
 void HelloTriangleApp::drawFrame()
 {
 	// At a high level:
@@ -1829,6 +2005,9 @@ void HelloTriangleApp::drawFrame()
 	{
 		throw std::runtime_error("[ERROR] : Failed to acquire swap chain image!");
 	}
+	
+	// Update uniform buffers
+	updateUniformBuffer(currentFrame);
 
 	// Reset fences
 	// Only reset fence if we are submitting work
@@ -1907,6 +2086,15 @@ void HelloTriangleApp::drawFrame()
 	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
+void HelloTriangleApp::cleanupUniformBuffers()
+{
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+	{
+		vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+		vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+	}
+}
+
 void HelloTriangleApp::cleanupVulkan()
 {
 	// Destroy (grahpics) pipeline
@@ -1929,6 +2117,15 @@ void HelloTriangleApp::cleanupVulkan()
 	}
 
 	cleanupSwapChain();
+
+	cleanupUniformBuffers();
+
+	// Destroy descriptor pools
+	// and implicitly destroy descriptor sets
+	vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+
+	// Destroy descriptor set layouts
+	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
 	// Destroy buffers and deallocate their memory spaces
 	vkDestroyBuffer(device, vertexBuffer, nullptr);
