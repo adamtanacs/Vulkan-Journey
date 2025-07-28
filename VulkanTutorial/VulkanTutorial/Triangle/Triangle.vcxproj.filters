@@ -22,6 +22,15 @@
     <Filter Include="Header Files\Utils">
       <UniqueIdentifier>{6d6c1547-72b9-4b16-ac35-5b53bb53a693}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Addons">
+      <UniqueIdentifier>{139348d2-9f59-487c-a7a1-8ad19bfe96d3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Addons">
+      <UniqueIdentifier>{e7cb40c9-a62f-4e81-885b-b36cabeba0f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\Textures">
+      <UniqueIdentifier>{c88eef8b-7e37-4899-9b81-abbb6688723c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -55,5 +64,10 @@
     <None Include="shader.frag">
       <Filter>Source Files\Shaders</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="texture.jpg">
+      <Filter>Resource Files\Textures</Filter>
+    </Image>
   </ItemGroup>
 </Project>

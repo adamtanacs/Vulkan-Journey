@@ -162,6 +162,9 @@ private:
 	std::vector<VkDeviceMemory> uniformBuffersMemory;
 	std::vector<void*> uniformBuffersMapped;
 
+	VkImage textureImage;
+	VkDeviceMemory textureImageMemory;
+
 	// ------------------ SYNCHRONIZATION OBJECTS ------------------
 	
 	// image is acquired from the swap chain
@@ -201,6 +204,7 @@ private:
 		createGraphicsPipeline();
 		createFramebuffers();
 		createCommandPool();
+		createTextureImage();
 		createVertexBuffer();
 		createIndexBuffer();
 		createUniformBuffers();
@@ -227,17 +231,23 @@ private:
 	void createCommandPool();
 	void oldCreateVertexBuffer();
 	void createVertexBuffer();
+	void createTextureImage();
 	void createIndexBuffer();
 	void createUniformBuffers();
 	void createDescriptorPool();
 	void createCommandBuffer();
 	void createSyncObjects();
 	void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+	VkCommandBuffer beginSingleTimeCommands();
+	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 	VkShaderModule createShaderModule(const std::vector<char>& code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+	void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
 	void updateUniformBuffer(uint32_t currentImage);
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 	bool checkDeviceExtensionSupport(VkPhysicalDevice device);
