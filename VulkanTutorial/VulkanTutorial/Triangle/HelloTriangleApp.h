@@ -163,7 +163,10 @@ private:
 	std::vector<void*> uniformBuffersMapped;
 
 	VkImage textureImage;
+	VkImageView textureImageView;
 	VkDeviceMemory textureImageMemory;
+
+	VkSampler textureSampler;
 
 	// ------------------ SYNCHRONIZATION OBJECTS ------------------
 	
@@ -205,6 +208,8 @@ private:
 		createFramebuffers();
 		createCommandPool();
 		createTextureImage();
+		createTextureImageView();
+		createTextureSampler();
 		createVertexBuffer();
 		createIndexBuffer();
 		createUniformBuffers();
@@ -232,6 +237,8 @@ private:
 	void oldCreateVertexBuffer();
 	void createVertexBuffer();
 	void createTextureImage();
+	void createTextureImageView();
+	void createTextureSampler();
 	void createIndexBuffer();
 	void createUniformBuffers();
 	void createDescriptorPool();
@@ -242,6 +249,7 @@ private:
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+	VkImageView createImageView(VkImage image, VkFormat format);
 	VkShaderModule createShaderModule(const std::vector<char>& code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);

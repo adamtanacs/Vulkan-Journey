@@ -390,6 +390,7 @@ void HelloTriangleApp::createLogicalDevice()
 
 	// Specify device features to use.
 	VkPhysicalDeviceFeatures deviceFeatures{};
+	deviceFeatures.samplerAnisotropy = VK_TRUE;
 
 	// Logical device creation infos.
 	// Using multiple queueFamilies.
@@ -560,32 +561,7 @@ void HelloTriangleApp::createImageViews()
 	swapChainImageViews.resize(swapChainImages.size());
 	for (size_t i = 0; i < swapChainImages.size(); ++i)
 	{
-		VkImageViewCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		createInfo.image = swapChainImages[i];
-
-		// Specify how the image data should be interpreted
-		createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D; /* 1D,2D or 3D texture */
-		createInfo.format = swapChainImageFormat;
-
-		// Option to swizzle around color channels or map constant values (0 or 1)
-		createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-		createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-		createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-		createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-		// Describe what the image's purpose is and which part should be accessed
-		createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		createInfo.subresourceRange.baseMipLevel = 0; /* Mipmap level first to be accessed */
-		createInfo.subresourceRange.levelCount = 1; /* No mipmapping levels */
-		// These are only used for stereographic 3D applications
-		createInfo.subresourceRange.baseArrayLayer = 0;
-		createInfo.subresourceRange.layerCount = 1;
-
-		if (vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS)
-		{
-			throw std::runtime_error("[ERROR] : Failed to create image views!");
-		}
+		swapChainImageViews[i] = createImageView(swapChainImages[i], swapChainImageFormat);
 	}
 }
 
@@ -1336,6 +1312,102 @@ void HelloTriangleApp::createTextureImage()
 	vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
+VkImageView HelloTriangleApp::createImageView(
+	VkImage image, 
+	VkFormat format
+)
+{
+	VkImageViewCreateInfo viewInfo{};
+	viewInfo.sType		= VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image		= image;
+	viewInfo.viewType	= VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format		= format;
+
+	viewInfo.subresourceRange.aspectMask		= VK_IMAGE_ASPECT_COLOR_BIT;
+	viewInfo.subresourceRange.baseMipLevel		= 0;
+	viewInfo.subresourceRange.levelCount		= 1;
+	viewInfo.subresourceRange.baseArrayLayer	= 0;
+	viewInfo.subresourceRange.layerCount		= 1;
+	// Left out explicitly: viewInfo.components = 0;
+
+	VkImageView imageView;
+	if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create texture image view!");
+	}
+
+	return imageView;
+}
+
+void HelloTriangleApp::createTextureImageView()
+{
+	textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB);
+}
+
+void HelloTriangleApp::createTextureSampler()
+{
+	// It is possible to access textures directly from shaders, but we use it rarely
+	
+	// Instead we use samplers
+	// which apply filtering and transformations 
+	// to compute the final output color 
+	// (useful for: oversampling, bilinear filtering, anisotropic filtering
+	//  addressing mode ((mirrored) repeat, clamp to edge/border))
+
+	VkSamplerCreateInfo samplerInfo{};
+	samplerInfo.sType				= VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	
+	// Specify how to interpolate texels 
+	// that are magnified/minified (oversampling/undersampling)
+	// Options: VK_FILTER_NEAREST, VK_FILTER_LINEAR
+	samplerInfo.magFilter			= VK_FILTER_LINEAR;
+	samplerInfo.minFilter			= VK_FILTER_LINEAR;
+	
+	// Specify address mode for each of the axes (U,V and W)
+	// Modes:
+	// VK_SAMPLER_ADDRESS_MODE_REPEAT				: Repeat texture
+	// VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT		: Repeat (mirrored) texture
+	// VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE		: Take color closest to edge
+	// VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE	: Take mirror color closest to edge
+	// VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER		: Return solid color when sampled
+	samplerInfo.addressModeU		= VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV		= VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW		= VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	
+	// Specify properties for anisotropic filtering
+	// For max anisotropy value: get from physical device property
+
+	VkPhysicalDeviceProperties properties{};
+	vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+	samplerInfo.anisotropyEnable	= VK_TRUE;
+	samplerInfo.maxAnisotropy		= properties.limits.maxSamplerAnisotropy;
+
+	// Specify what value to use for border addressing mode
+	// It can be black/white/transparent with INT/FLOAT formats
+	samplerInfo.borderColor			= VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+
+	// We can also tell to use unnormalised coordinates
+	// instead of [0,1] range we can use [0,texWidth] and [0,texHeight] ranges
+	//samplerInfo.unnormalizedCoordinates = VK_TRUE;
+
+	// Specify if we want to use comparison operations for sampling
+	// Mainly used for percentage-closer filtering (for more: https://developer.nvidia.com/gpugems/gpugems/part-ii-lighting-and-shadows/chapter-11-shadow-map-antialiasing)
+	samplerInfo.compareEnable		= VK_FALSE;
+	samplerInfo.compareOp			= VK_COMPARE_OP_ALWAYS;
+
+	// Specify properties for mipmapping
+	samplerInfo.mipmapMode			= VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias			= 0.0f;
+	samplerInfo.minLod				= 0.0f;
+	samplerInfo.maxLod				= 0.0f;
+
+	if (vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS)
+	{
+		throw std::runtime_error("[ERROR] : Failed to create texture sampler!");
+	}
+}
+
 void HelloTriangleApp::createIndexBuffer()
 {
 	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
@@ -1956,7 +2028,10 @@ bool HelloTriangleApp::isDeviceSuitable(VkPhysicalDevice device)
 		swapChainAdequete = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
 	}
 
-	return indices.isComplete() && extensionSupported && swapChainAdequete;
+	return	indices.isComplete() && 
+			extensionSupported && 
+			swapChainAdequete &&
+			deviceFeatures.samplerAnisotropy;
 }
 
 void HelloTriangleApp::createSurface()
@@ -2371,7 +2446,13 @@ void HelloTriangleApp::cleanupVulkan()
 
 	cleanupSwapChain();
 
-	// Clean up images and their memories
+	// Clean up texture samplers
+	vkDestroySampler(device, textureSampler, nullptr);
+
+	// Clean up texture image views
+	vkDestroyImageView(device, textureImageView, nullptr);
+
+	// Clean up texture images and their memories
 	vkDestroyImage(device, textureImage, nullptr);
 	vkFreeMemory(device, textureImageMemory, nullptr);
 
