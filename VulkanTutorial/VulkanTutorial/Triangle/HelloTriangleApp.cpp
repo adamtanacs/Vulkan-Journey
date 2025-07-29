@@ -567,7 +567,7 @@ void HelloTriangleApp::createImageViews()
 
 void HelloTriangleApp::createDescriptorSetLayout()
 {
-	// Define descriptor set layout binding properties
+	// Define descriptor set layout binding properties for UBO
 	VkDescriptorSetLayoutBinding uboLayoutBinding{};
 	uboLayoutBinding.binding			= 0; /* used for referencing in shader */
 	// Set the type of our stored resource
@@ -579,12 +579,25 @@ void HelloTriangleApp::createDescriptorSetLayout()
 	// Only related for image sampling descriptors
 	uboLayoutBinding.pImmutableSamplers = nullptr;
 
+	// Define descriptor set layout binding properties for Sampler
+	VkDescriptorSetLayoutBinding samplerBinding{};
+	samplerBinding.binding				= 1;
+	samplerBinding.descriptorCount		= 1;
+	samplerBinding.descriptorType		= VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	samplerBinding.pImmutableSamplers	= nullptr;
+	samplerBinding.stageFlags			= VK_SHADER_STAGE_FRAGMENT_BIT;
+
+	std::array<VkDescriptorSetLayoutBinding, 2> bindings = { 
+		uboLayoutBinding,
+		samplerBinding 
+	};
+	
 	// Define descriptor set layout properties
 	VkDescriptorSetLayoutCreateInfo layoutInfo{};
 	layoutInfo.sType					= VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	// Defining bindings of our descriptor set
-	layoutInfo.bindingCount				= 1;
-	layoutInfo.pBindings				= &uboLayoutBinding;
+	layoutInfo.bindingCount				= static_cast<uint32_t>(bindings.size());
+	layoutInfo.pBindings				= bindings.data();
 
 	if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
 	{
@@ -619,26 +632,45 @@ void HelloTriangleApp::createDescriptorSets()
 		// For whole buffer rewrite: VK_WHOLE_SIZE
 		bufferInfo.range = sizeof(UniformBufferObject);	/* size of our data */
 
+		VkDescriptorImageInfo imageInfo{};
+		imageInfo.imageLayout	= VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		imageInfo.imageView		= textureImageView;
+		imageInfo.sampler		= textureSampler;
+
+		std::array<VkWriteDescriptorSet, 2> descriptorWrite{};
 		// Updating configurations of descriptors
-		VkWriteDescriptorSet descriptorWrite{};
-		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite.dstSet = descriptorSets[i];
-		descriptorWrite.dstBinding = 0;
+		descriptorWrite[0].sType			= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrite[0].dstSet			= descriptorSets[i];
+		descriptorWrite[0].dstBinding		= 0;
 		// Because descriptor sets can be arrays
-		descriptorWrite.dstArrayElement = 0;
+		descriptorWrite[0].dstArrayElement	= 0;
 		// We need to specify descriptor type again
-		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrite[0].descriptorType	= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		// Also need to specify the number of descriptors
 		// because we can update multiple types of buffers
-		descriptorWrite.descriptorCount = 1;
+		descriptorWrite[0].descriptorCount	= 1;
 		// Reference an array of {descriptorCount} size
 		// to configure our descriptors
-		descriptorWrite.pBufferInfo = &bufferInfo;	/* reference buffer data */
-		descriptorWrite.pImageInfo = nullptr;		/* reference image data */
-		descriptorWrite.pTexelBufferView = nullptr;		/* reference buffer view */
+		descriptorWrite[0].pBufferInfo		= &bufferInfo;	/* reference buffer data */
+		descriptorWrite[0].pImageInfo		= nullptr;		/* reference image data */
+		descriptorWrite[0].pTexelBufferView	= nullptr;		/* reference buffer view */
+
+		descriptorWrite[1].sType			= VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrite[1].dstSet			= descriptorSets[i];
+		descriptorWrite[1].dstBinding		= 1;
+		descriptorWrite[1].dstArrayElement	= 0;
+		descriptorWrite[1].descriptorType	= VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrite[1].descriptorCount	= 1;
+		descriptorWrite[1].pImageInfo		= &imageInfo;	/* reference image data */
 
 		// There is also the option to copy entire descriptors
-		vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+		vkUpdateDescriptorSets(
+			device, 
+			static_cast<uint32_t>(descriptorWrite.size()),
+			descriptorWrite.data(),
+			0, 
+			nullptr
+		);
 	}
 }
 
@@ -1472,17 +1504,22 @@ void HelloTriangleApp::createDescriptorPool()
 	// Descriptor sets need to be created through descriptor pools
 
 	// Define descriptor pool size and type
-	VkDescriptorPoolSize poolSize{};
-	poolSize.type				= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSize.descriptorCount	= static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	std::array<VkDescriptorPoolSize,2> poolSize{};
+	poolSize[0].type			= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSize[0].descriptorCount	= static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+	poolSize[1].type			= VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	poolSize[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
 	// Define descriptor pool properties
+	// Possible error that even validation layer can'ts find (Vulkan 1.1)
+	// VK_ERROR_POOL_OUT_OF_MEMORY : pool is not large enough to allocate more
+	//								 BUT the driver may try to solve it under the hood
 	VkDescriptorPoolCreateInfo poolInfo{};
 	poolInfo.sType			= VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount	= 1;
+	poolInfo.poolSizeCount	= static_cast<uint32_t>(poolSize.size());
+	poolInfo.pPoolSizes		= poolSize.data();
 	// Also define maximum count of descriptor sets
 	poolInfo.maxSets		= static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-	poolInfo.pPoolSizes		= &poolSize;
 	// Also has a flag for whether individial descriptor sets can be freed or not
 	// VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
 
