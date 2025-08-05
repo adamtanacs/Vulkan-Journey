@@ -141,15 +141,20 @@ private:
 	// ------------------------- MESH DATA -------------------------
 
 	const std::vector<Vertex> vertices = {
-		{{-0.5f, -0.5f},	{1.0f, 0.0f, 0.0f},	{1.0f, 0.0f}},
-		{{0.5f, -0.5f},		{0.0f, 1.0f, 0.0f},	{0.0f, 0.0f}},
-		{{0.5f, 0.5f},		{0.0f, 0.0f, 1.0f},	{0.0f, 1.0f}},
-		{{-0.5f, 0.5f},		{1.0f, 1.0f, 1.0f},	{1.0f, 1.0f}}
+		{{-0.5f, -0.5f, 0.0f},	{1.0f, 0.0f, 0.0f},	{1.0f, 0.0f}},
+		{{0.5f, -0.5f, 0.0f},	{0.0f, 1.0f, 0.0f},	{0.0f, 0.0f}},
+		{{0.5f, 0.5f, 0.0f},	{0.0f, 0.0f, 1.0f},	{0.0f, 1.0f}},
+		{{-0.5f, 0.5f, 0.0f},	{1.0f, 1.0f, 1.0f},	{1.0f, 1.0f}},
+
+		{{-0.5f, -0.5f, -0.5f},	{1.0f, 0.0f, 0.0f},	{0.0f, 0.0f}},
+		{{0.5f, -0.5f, -0.5f},	{0.0f, 1.0f, 0.0f},	{1.0f, 0.0f}},
+		{{0.5f, 0.5f, -0.5f},	{0.0f, 0.0f, 1.0f},	{1.0f, 1.0f}},
+		{{-0.5f, 0.5f, -0.5f},	{1.0f, 1.0f, 1.0f},	{0.0f, 1.0f}}
 	};
 
 	const std::vector<uint32_t> indices = {
-		0, 1, 2,
-		2, 3, 0
+		0, 1, 2, 2, 3, 0,
+		4, 5, 6, 6, 7, 4
 	};
 
 	// -------------------------- BUFFERS --------------------------
@@ -167,6 +172,10 @@ private:
 	VkDeviceMemory textureImageMemory;
 
 	VkSampler textureSampler;
+
+	VkImage depthImage;
+	VkImageView depthImageView;
+	VkDeviceMemory depthImageMemory;
 
 	// ------------------ SYNCHRONIZATION OBJECTS ------------------
 	
@@ -205,8 +214,9 @@ private:
 		createRenderPass();
 		createDescriptorSetLayout();
 		createGraphicsPipeline();
-		createFramebuffers();
 		createCommandPool();
+		createDepthResources();
+		createFramebuffers();
 		createTextureImage();
 		createTextureImageView();
 		createTextureSampler();
@@ -233,6 +243,7 @@ private:
 	void createGraphicsPipeline();
 	void createRenderPass();
 	void createFramebuffers();
+	void createDepthResources();
 	void createCommandPool();
 	void oldCreateVertexBuffer();
 	void createVertexBuffer();
@@ -249,10 +260,13 @@ private:
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-	VkImageView createImageView(VkImage image, VkFormat format);
+	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 	VkShaderModule createShaderModule(const std::vector<char>& code);
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+	bool hasStencilComponent(VkFormat format);
+	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+	VkFormat findDepthFormat();
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 	void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);

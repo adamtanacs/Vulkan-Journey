@@ -28,7 +28,7 @@ std::array<VkVertexInputAttributeDescription, 3> Vertex::attributeDescriptions()
 	// vec2		: VK_FORMAT_R32G32_SFLOAT
 	// vec3		: VK_FORMAT_R32G32B32_SFLOAT
 	// vec4		: VK_FORMAT_R32G32B32A32_SFLOAT
-	attributeDescriptions[0].format		= VK_FORMAT_R32G32_SFLOAT;
+	attributeDescriptions[0].format		= VK_FORMAT_R32G32B32_SFLOAT;
 	// Offset of our attribute inside the vertex struct
 	attributeDescriptions[0].offset		= offsetof(Vertex, pos);
 
