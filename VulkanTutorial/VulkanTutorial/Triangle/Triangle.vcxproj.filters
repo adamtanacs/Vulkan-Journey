@@ -31,6 +31,9 @@
     <Filter Include="Resource Files\Textures">
       <UniqueIdentifier>{c88eef8b-7e37-4899-9b81-abbb6688723c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\Models">
+      <UniqueIdentifier>{bd9bb272-b3e7-45c1-a986-7291f4227dca}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -69,5 +72,13 @@
     <Image Include="texture.jpg">
       <Filter>Resource Files\Textures</Filter>
     </Image>
+    <Image Include="viking_room.png">
+      <Filter>Resource Files\Textures</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="viking_room.obj">
+      <Filter>Resource Files\Models</Filter>
+    </Media>
   </ItemGroup>
 </Project>

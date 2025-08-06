@@ -26,6 +26,7 @@
 #include <limits>
 #include <algorithm>
 #include <chrono>
+#include <unordered_map>
 
 #include "ShaderCompiler.h"
 #include "Vertex.h"
@@ -140,22 +141,8 @@ private:
 
 	// ------------------------- MESH DATA -------------------------
 
-	const std::vector<Vertex> vertices = {
-		{{-0.5f, -0.5f, 0.0f},	{1.0f, 0.0f, 0.0f},	{1.0f, 0.0f}},
-		{{0.5f, -0.5f, 0.0f},	{0.0f, 1.0f, 0.0f},	{0.0f, 0.0f}},
-		{{0.5f, 0.5f, 0.0f},	{0.0f, 0.0f, 1.0f},	{0.0f, 1.0f}},
-		{{-0.5f, 0.5f, 0.0f},	{1.0f, 1.0f, 1.0f},	{1.0f, 1.0f}},
-
-		{{-0.5f, -0.5f, -0.5f},	{1.0f, 0.0f, 0.0f},	{0.0f, 0.0f}},
-		{{0.5f, -0.5f, -0.5f},	{0.0f, 1.0f, 0.0f},	{1.0f, 0.0f}},
-		{{0.5f, 0.5f, -0.5f},	{0.0f, 0.0f, 1.0f},	{1.0f, 1.0f}},
-		{{-0.5f, 0.5f, -0.5f},	{1.0f, 1.0f, 1.0f},	{0.0f, 1.0f}}
-	};
-
-	const std::vector<uint32_t> indices = {
-		0, 1, 2, 2, 3, 0,
-		4, 5, 6, 6, 7, 4
-	};
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
 
 	// -------------------------- BUFFERS --------------------------
 
@@ -220,6 +207,7 @@ private:
 		createTextureImage();
 		createTextureImageView();
 		createTextureSampler();
+		loadModel();
 		createVertexBuffer();
 		createIndexBuffer();
 		createUniformBuffers();
@@ -246,6 +234,7 @@ private:
 	void createDepthResources();
 	void createCommandPool();
 	void oldCreateVertexBuffer();
+	void loadModel();
 	void createVertexBuffer();
 	void createTextureImage();
 	void createTextureImageView();

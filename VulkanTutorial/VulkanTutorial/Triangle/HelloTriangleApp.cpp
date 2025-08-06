@@ -1,5 +1,8 @@
 #include "HelloTriangleApp.h"
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -1217,6 +1220,57 @@ void HelloTriangleApp::createCommandPool()
 	}
 }
 
+void HelloTriangleApp::loadModel()
+{
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+
+	std::string warn;
+	std::string err;
+
+	if (!tinyobj::LoadObj(
+		&attrib,
+		&shapes,
+		&materials,
+		&warn,
+		&err,
+		"viking_room.obj"))
+	{
+		throw std::runtime_error("[ERROR] : " + err);
+	}
+
+	if (!warn.empty())
+	{
+		std::cerr << "[TINYOBJ WARNING]" << warn.c_str() << std::endl;
+	}
+
+	for (const auto& shape : shapes)
+	{
+		for (const auto index : shape.mesh.indices)
+		{
+			// Each vertex is separate
+			Vertex vertex{};
+
+			vertex.pos = {
+				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2]
+			};
+
+			vertex.texCoord = {
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				attrib.texcoords[2 * index.texcoord_index + 1]
+			};
+
+			vertex.color = { 1.0f, 1.0f, 1.0f };
+
+			vertices.push_back(vertex);
+			indices.push_back(indices.size());
+		}
+	}
+}
+
 void HelloTriangleApp::oldCreateVertexBuffer()
 {
 	// Buffers are regions of memory read and used by the GPU
@@ -1364,7 +1418,7 @@ void HelloTriangleApp::createTextureImage()
 	// Loading a texture
 	int texWidth, texHeight, texChannels;
 	stbi_uc* pixels = stbi_load(
-		"texture.jpg",
+		"viking_room.png",
 		&texWidth,
 		&texHeight,
 		&texChannels,
