@@ -1245,6 +1245,9 @@ void HelloTriangleApp::loadModel()
 		std::cerr << "[TINYOBJ WARNING]" << warn.c_str() << std::endl;
 	}
 
+	// For culling unnecessary vertices
+	std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
 	for (const auto& shape : shapes)
 	{
 		for (const auto index : shape.mesh.indices)
@@ -1265,8 +1268,17 @@ void HelloTriangleApp::loadModel()
 
 			vertex.color = { 1.0f, 1.0f, 1.0f };
 
-			vertices.push_back(vertex);
-			indices.push_back(indices.size());
+			// We check if we have seen this vertex before
+			// if yes	: ignore it
+			// if no	: add to vertex buffer
+			if (uniqueVertices.count(vertex) == 0)
+			{
+				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+				vertices.push_back(vertex);
+			}
+
+			// But always add its index to the index buffer
+			indices.push_back(uniqueVertices[vertex]);
 		}
 	}
 }
